@@ -10,7 +10,7 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
-          "Host": "${Urls__YoutubeAudioEndpoint1}",
+          "Host": "${Urls__YoutubeEndpoint1}",
           "Port": 8080
         }
       ],
@@ -31,7 +31,7 @@
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {
-          "Host": "${Urls__YoutubeHealthEndpoint}",
+          "Host": "${Urls__YoutubeEndpoint1}",
           "Port": 8080
         }
       ],
