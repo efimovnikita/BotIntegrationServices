@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4FCD8132-B437-4C95-B606-5A6C2D52811B}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateway", "Gateway", "{3997720D-FF47-4020-9E28-27F8F27283AE}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Services", "Services", "{669D936C-0EA9-4283-8438-7EE11EC48582}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{BEF7CDDB-0C6C-476A-BC7A-CFB477A9AE1C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Gateway", "BotIntegration.Gateway\BotIntegration.Gateway.csproj", "{2C791244-A4B8-49C8-A32B-71B46D9743F9}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Shared", "Shared", "{5867C45A-C78F-40A1-88FB-9346A2DB1E11}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Shared", "BotIntegration.Shared\BotIntegration.Shared.csproj", "{732C1421-151B-4241-BB9B-E9A079C9C819}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{2C791244-A4B8-49C8-A32B-71B46D9743F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2C791244-A4B8-49C8-A32B-71B46D9743F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2C791244-A4B8-49C8-A32B-71B46D9743F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2C791244-A4B8-49C8-A32B-71B46D9743F9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{732C1421-151B-4241-BB9B-E9A079C9C819}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{732C1421-151B-4241-BB9B-E9A079C9C819}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{732C1421-151B-4241-BB9B-E9A079C9C819}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{732C1421-151B-4241-BB9B-E9A079C9C819}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{3997720D-FF47-4020-9E28-27F8F27283AE} = {4FCD8132-B437-4C95-B606-5A6C2D52811B}
+		{669D936C-0EA9-4283-8438-7EE11EC48582} = {4FCD8132-B437-4C95-B606-5A6C2D52811B}
+		{2C791244-A4B8-49C8-A32B-71B46D9743F9} = {3997720D-FF47-4020-9E28-27F8F27283AE}
+		{5867C45A-C78F-40A1-88FB-9346A2DB1E11} = {4FCD8132-B437-4C95-B606-5A6C2D52811B}
+		{732C1421-151B-4241-BB9B-E9A079C9C819} = {5867C45A-C78F-40A1-88FB-9346A2DB1E11}
+	EndGlobalSection
+EndGlobal
