@@ -2,5 +2,45 @@
   "GlobalConfiguration": {
     "BaseUrl": "${Urls__BaseUrl}"
   },
-  "Routes": []
+  "Routes": [
+    {
+      "UpstreamPathTemplate": "/api/gateway/youtube/v1/audio",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/audio",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__YoutubeAudioEndpoint1}",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      },
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 25
+      }
+    },
+    {
+      "UpstreamPathTemplate": "/api/gateway/youtube/v1/health",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/healthcheck",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__YoutubeHealthEndpoint}",
+          "Port": 8080
+        }
+      ],
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 25
+      }
+    }
+  ]
 }
