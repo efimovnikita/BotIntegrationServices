@@ -10,6 +10,11 @@ try
 {
     var builder = WebApplication.CreateBuilder(args);
     
+    builder.WebHost.ConfigureKestrel(serverOptions =>
+    {
+        serverOptions.Limits.MaxRequestBodySize = null;
+    });
+    
     builder.Configuration.AddEnvironmentVariables();
 
     Log.Logger = new LoggerConfiguration()
