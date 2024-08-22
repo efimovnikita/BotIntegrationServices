@@ -14,9 +14,6 @@
           "Port": 8080
         }
       ],
-      "AuthenticationOptions": {
-        "AuthenticationProviderKey": "Bearer"
-      },
       "RateLimitOptions": {
         "EnableRateLimiting": true,
         "Period": "1m",
