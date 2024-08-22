@@ -7,6 +7,8 @@ namespace BotIntegration.Services.FileSharing.Controllers;
 public class FileController(IWebHostEnvironment environment, IConfiguration configuration, ILogger<FileController> logger) : ControllerBase
 {
     [HttpPost("upload")]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue, ValueLengthLimit = int.MaxValue)]
     public async Task<IActionResult> UploadFile(IFormFile? file)
     {
         logger.LogInformation("UploadFile method called");
