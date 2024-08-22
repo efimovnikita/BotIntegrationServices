@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+    <PropertyGroup>
+        <TargetFramework>net8.0</TargetFramework>
+        <Nullable>enable</Nullable>
+        <ImplicitUsings>enable</ImplicitUsings>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
+        <PackageReference Include="Serilog.Sinks.Seq" Version="8.0.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="wwwroot\uploads\af64e049-949a-4a68-a902-feb6a8619389_Как устроиться работать на башенный кран #shorts [TubeRipper.com].mp3" />
+      <_ContentIncludedByDefault Remove="wwwroot\uploads\eb3ec13b-7afe-492a-94d9-77a71ab828ea" />
+      <_ContentIncludedByDefault Remove="wwwroot\uploads\f0e45336-930f-4f0b-97f1-5140c73685e5.mp3" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <Folder Include="wwwroot\" />
+    </ItemGroup>
+
+</Project>
