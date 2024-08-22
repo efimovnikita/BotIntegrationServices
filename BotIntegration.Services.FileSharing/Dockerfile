@@ -1,10 +1,4 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-
-RUN addgroup --gid 1000 appgroup && \
-    adduser --uid 1000 --ingroup appgroup --disabled-password --gecos "" appuser
-
-USER appuser
-
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
@@ -26,6 +20,6 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-USER appuser
+RUN mkdir -p /app/wwwroot/uploads && chown -R $APP_UID:$APP_UID /app/wwwroot/uploads
 
 ENTRYPOINT ["dotnet", "BotIntegration.Services.FileSharing.dll"]
