@@ -4,9 +4,9 @@
   },
   "Routes": [
     {
-      "UpstreamPathTemplate": "/api/gateway/files-share/v1/uploads",
+      "UpstreamPathTemplate": "/api/gateway/files-share/v1/uploads/{everything}",
       "UpstreamHttpMethod": [ "Get" ],
-      "DownstreamPathTemplate": "/uploads",
+      "DownstreamPathTemplate": "/uploads/{everything}",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {

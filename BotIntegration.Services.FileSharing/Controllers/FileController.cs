@@ -4,7 +4,7 @@ namespace BotIntegration.Services.FileSharing.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class FileController(IWebHostEnvironment environment) : ControllerBase
+public class FileController(IWebHostEnvironment environment, IConfiguration configuration) : ControllerBase
 {
     [HttpPost("upload")]
     public async Task<IActionResult> UploadFile(IFormFile? file)
@@ -28,7 +28,7 @@ public class FileController(IWebHostEnvironment environment) : ControllerBase
             await file.CopyToAsync(fileStream);
         }
 
-        var fileUrl = $"{Request.Scheme}://{Request.Host}/uploads/{uniqueFileName}";
+        var fileUrl = $"{configuration["Urls:GatewayServer"]}{uniqueFileName}";  
         return Ok(new { fileUrl });
     }
 }
