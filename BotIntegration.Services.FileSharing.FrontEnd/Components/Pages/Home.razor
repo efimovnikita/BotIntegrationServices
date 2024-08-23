@@ -12,7 +12,9 @@
 <h1>Temporary file storage</h1>
 
 <InputFile OnChange="@HandleFileSelected" />
-<button type="button" disabled="@(!_fileSelected)" @onclick="UploadFile">Upload</button><br /><br />
+<button type="button" disabled="@((_fileSelected && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)" @onclick="UploadFile">Upload</button><br /><br />
+<label for="client-secret">Client secret:</label>
+<input type="password" id="client-secret" name="client-secret" @bind="ClientSecret"/><br /><br />
 <label for="link">Direct link:</label>
 <input type="text" id="link" name="link" @bind="LinkValue" />
 <button type="button" disabled="@string.IsNullOrEmpty(LinkValue)" @onclick="CopyLink">Copy</button>
@@ -21,6 +23,7 @@
     private bool _fileSelected;
     private IBrowserFile? _selectedFile;
     private string LinkValue { get; set; } = string.Empty;
+    private string ClientSecret { get; set; } = string.Empty;
     
     private void HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -67,15 +70,14 @@
             
             var authServer = configuration["Urls:AuthServer"];
             var clientId = configuration["ClientConfiguration:ClientId"];
-            var clientSecret = configuration["ClientConfiguration:ClientSecret"];
 
-            if ((authServer != null && clientId != null && clientSecret != null) == false)
+            if ((authServer != null && clientId != null && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)
             {
                 logger.LogWarning("Unable to authorize the bot");
                 return;
             }
 
-            var authData = await GetAuthData(httpClient, authServer, clientId, clientSecret);
+            var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
             if (authData == null)
             {
                 logger.LogWarning("Unable to authorize the bot");
