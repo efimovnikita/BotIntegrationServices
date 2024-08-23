@@ -9,21 +9,73 @@
 
 <PageTitle>Upload a file and get the link</PageTitle>
 
-<h1>Temporary file storage</h1>
+<div class="max-w-md mx-auto p-6 bg-gray-50 rounded-lg shadow-md mt-1 lg:mt-6">
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="file-input">
+            Select File
+        </label>
+        <InputFile OnChange="@HandleFileSelected" class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none" id="file-input" />
+    </div>
 
-<InputFile OnChange="@HandleFileSelected" />
-<button type="button" disabled="@((_fileSelected && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)" @onclick="UploadFile">Upload</button><br /><br />
-<label for="client-secret">Client secret:</label>
-<input type="password" id="client-secret" name="client-secret" @bind="ClientSecret"/><br /><br />
-<label for="link">Direct link:</label>
-<input type="text" id="link" name="link" @bind="LinkValue" />
-<button type="button" disabled="@string.IsNullOrEmpty(LinkValue)" @onclick="CopyLink">Copy</button>
+    <div class="mb-4">
+        <button type="button"
+                class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled="@((_fileSelected && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)"
+                @onclick="UploadFile">
+            Upload
+        </button>
+    </div>
+
+    @if (IsUploading)
+    {
+    <div class="mb-4">
+        <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 overflow-hidden">
+            <div class="bg-blue-600 h-full rounded-full animate-indeterminate-progress"></div>
+        </div>
+    </div>
+    }
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="client-secret">
+            Client secret:
+        </label>
+        <input type="password"
+               id="client-secret"
+               name="client-secret"
+               @bind="ClientSecret"
+               class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500" />
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="link">
+            Direct link:
+        </label>
+        <div class="flex relative">
+            <input type="text"
+                   id="link"
+                   name="link"
+                   @bind="LinkValue"
+                   class="flex-grow px-3 py-2 text-gray-700 bg-white border rounded-l-lg focus:outline-none focus:border-blue-500" />
+            <button type="button"
+                    disabled="@string.IsNullOrEmpty(LinkValue)"
+                    @onclick="CopyLink"
+                    class="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded-r-lg focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed">
+                Copy
+            </button>
+            <div class="absolute right-0 mt-12 bg-gray-800 text-white text-sm py-1 px-2 rounded shadow-lg transition-opacity duration-300 @(ShowTooltip ? "opacity-100" : "opacity-0")">
+                Copied!
+            </div>
+        </div>
+    </div>
+</div>
 
 @code {
     private bool _fileSelected;
     private IBrowserFile? _selectedFile;
     private string LinkValue { get; set; } = string.Empty;
     private string ClientSecret { get; set; } = string.Empty;
+    private bool ShowTooltip { get; set; }
+    private bool IsUploading { get; set; }
     
     private void HandleFileSelected(InputFileChangeEventArgs e)
     {
@@ -36,105 +88,125 @@
         if (!string.IsNullOrEmpty(LinkValue))
         {
             await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", LinkValue);
+            
+            // Show tooltip
+            ShowTooltip = true;
+            StateHasChanged();
+
+            // Hide tooltip after 2 seconds
+            await Task.Delay(2000);
+            ShowTooltip = false;
+            StateHasChanged();
         }
     }
     
     private async Task UploadFile()
     {
-        if (_selectedFile != null)
+        try
         {
-            LinkValue = String.Empty;
+            IsUploading = true;
+            StateHasChanged();
             
-            var httpClient = clientFactory.CreateClient();
-            httpClient.Timeout = TimeSpan.FromMinutes(5);
-            
-            var fileSharingEndpointHealthUrl = configuration["Urls:FileSharingEndpointHealth"];
-            if (fileSharingEndpointHealthUrl == null)
+            if (_selectedFile != null)
             {
-                logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
-                return;
-            }
-                
-            var uploadEndHealthRequest = new HttpRequestMessage
-            {
-                Method = HttpMethod.Get,
-                RequestUri = new Uri(fileSharingEndpointHealthUrl),
-            };
-                
-            using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
-            if (uploadEndHealthResponse.IsSuccessStatusCode == false)
-            {
-                logger.LogWarning("File sharing endpoint is down");
-                return;
-            }
-            
-            var authServer = configuration["Urls:AuthServer"];
-            var clientId = configuration["ClientConfiguration:ClientId"];
+                LinkValue = String.Empty;
 
-            if ((authServer != null && clientId != null && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)
-            {
-                logger.LogWarning("Unable to authorize the bot");
-                return;
-            }
+                var httpClient = clientFactory.CreateClient();
+                httpClient.Timeout = TimeSpan.FromMinutes(5);
 
-            var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
-            if (authData == null)
-            {
-                logger.LogWarning("Unable to authorize the bot");
-                return;
-            }
-            
-            var fileSharingEndpointUrl = configuration["Urls:FileSharingEndpoint"];
-            if (fileSharingEndpointUrl == null)
-            {
-                logger.LogWarning("Unable to get the file sharing endpoint url");
-                return;
-            }
-            
-            var uploadFileRequest = new HttpRequestMessage
-            {
-                Method = HttpMethod.Post,
-                RequestUri = new Uri(fileSharingEndpointUrl),
-                Headers =
+                var fileSharingEndpointHealthUrl = configuration["Urls:FileSharingEndpointHealth"];
+                if (fileSharingEndpointHealthUrl == null)
                 {
-                    { "Authorization", $"Bearer {authData.AccessToken}" },
-                },
-            };
+                    logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
+                    return;
+                }
 
-            var content = new MultipartFormDataContent();
-            
-            await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100_000_000);
-            using var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream);
-            var fileBytes = memoryStream.ToArray();
-            
-            var fileContent = new ByteArrayContent(fileBytes);
-            fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
-            content.Add(fileContent, "file", _selectedFile.Name);
-            uploadFileRequest.Content = content;
-                
-            using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
-            if (uploadFileResponse.IsSuccessStatusCode == false)
-            {
-                logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
-                return;
-            }
-                
-            var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
-            if (string.IsNullOrEmpty(uploadResultStr))
-            {
-                logger.LogWarning("Unable to get upload data from file sharing server");
-                return;
-            }
-            
-            var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
-            if (uploadData == null)
-            {
-                logger.LogWarning("Unable to get upload data from file sharing server");
-                return;
-            }
+                var uploadEndHealthRequest = new HttpRequestMessage
+                {
+                    Method = HttpMethod.Get,
+                    RequestUri = new Uri(fileSharingEndpointHealthUrl),
+                };
 
-            LinkValue = uploadData.FileUrl;
+                using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
+                if (uploadEndHealthResponse.IsSuccessStatusCode == false)
+                {
+                    logger.LogWarning("File sharing endpoint is down");
+                    return;
+                }
+
+                var authServer = configuration["Urls:AuthServer"];
+                var clientId = configuration["ClientConfiguration:ClientId"];
+
+                if ((authServer != null && clientId != null && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)
+                {
+                    logger.LogWarning("Unable to authorize the bot");
+                    return;
+                }
+
+                var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
+                if (authData == null)
+                {
+                    logger.LogWarning("Unable to authorize the bot");
+                    return;
+                }
+
+                var fileSharingEndpointUrl = configuration["Urls:FileSharingEndpoint"];
+                if (fileSharingEndpointUrl == null)
+                {
+                    logger.LogWarning("Unable to get the file sharing endpoint url");
+                    return;
+                }
+
+                var uploadFileRequest = new HttpRequestMessage
+                {
+                    Method = HttpMethod.Post,
+                    RequestUri = new Uri(fileSharingEndpointUrl),
+                    Headers =
+                    {
+                        { "Authorization", $"Bearer {authData.AccessToken}" },
+                    },
+                };
+
+                var content = new MultipartFormDataContent();
+
+                await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100_000_000);
+                using var memoryStream = new MemoryStream();
+                await stream.CopyToAsync(memoryStream);
+                var fileBytes = memoryStream.ToArray();
+
+                var fileContent = new ByteArrayContent(fileBytes);
+                fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
+                content.Add(fileContent, "file", _selectedFile.Name);
+                uploadFileRequest.Content = content;
+
+                using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
+                if (uploadFileResponse.IsSuccessStatusCode == false)
+                {
+                    logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
+                    return;
+                }
+
+                var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
+                if (string.IsNullOrEmpty(uploadResultStr))
+                {
+                    logger.LogWarning("Unable to get upload data from file sharing server");
+                    return;
+                }
+
+                var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
+                if (uploadData == null)
+                {
+                    logger.LogWarning("Unable to get upload data from file sharing server");
+                    return;
+                }
+
+                LinkValue = uploadData.FileUrl;
+            }
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
         }
     }
     

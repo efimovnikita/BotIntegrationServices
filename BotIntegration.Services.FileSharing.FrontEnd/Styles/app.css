@@ -1,0 +1,11 @@
+﻿@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@keyframes indeterminate-progress {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+}
+.animate-indeterminate-progress {
+    animation: indeterminate-progress 1.5s infinite linear;
+}
