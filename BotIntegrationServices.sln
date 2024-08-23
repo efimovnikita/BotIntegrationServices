@@ -18,6 +18,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.You
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.FileSharing", "BotIntegration.Services.FileSharing\BotIntegration.Services.FileSharing.csproj", "{BDC371E9-8AF5-4B06-AFC9-18A9F55D49EB}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.FileSharing.FrontEnd", "BotIntegration.Services.FileSharing.FrontEnd\BotIntegration.Services.FileSharing.FrontEnd.csproj", "{9C7931FE-D731-4CAA-935A-3F5A8C174BCB}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -40,6 +42,10 @@ Global
 		{BDC371E9-8AF5-4B06-AFC9-18A9F55D49EB}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{BDC371E9-8AF5-4B06-AFC9-18A9F55D49EB}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{BDC371E9-8AF5-4B06-AFC9-18A9F55D49EB}.Release|Any CPU.Build.0 = Release|Any CPU
+		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3997720D-FF47-4020-9E28-27F8F27283AE} = {4FCD8132-B437-4C95-B606-5A6C2D52811B}
@@ -49,5 +55,6 @@ Global
 		{732C1421-151B-4241-BB9B-E9A079C9C819} = {5867C45A-C78F-40A1-88FB-9346A2DB1E11}
 		{E886B0A5-CC6F-4D60-8057-3B3DCB77ABA6} = {669D936C-0EA9-4283-8438-7EE11EC48582}
 		{BDC371E9-8AF5-4B06-AFC9-18A9F55D49EB} = {669D936C-0EA9-4283-8438-7EE11EC48582}
+		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB} = {669D936C-0EA9-4283-8438-7EE11EC48582}
 	EndGlobalSection
 EndGlobal

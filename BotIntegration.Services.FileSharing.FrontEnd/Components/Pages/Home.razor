@@ -1,0 +1,176 @@
+﻿@page "/"
+@using System.Net.Http.Headers
+@using System.Text.Json
+@using BotIntegration.Services.FileSharing.FrontEnd.Components.Models
+@inject IHttpClientFactory clientFactory
+@inject IConfiguration configuration
+@inject ILogger<Home> logger
+@inject IJSRuntime JSRuntime
+
+<PageTitle>Upload a file and get the link</PageTitle>
+
+<h1>Temporary file storage</h1>
+
+<InputFile OnChange="@HandleFileSelected" />
+<button type="button" disabled="@(!_fileSelected)" @onclick="UploadFile">Upload</button><br /><br />
+<label for="link">Direct link:</label>
+<input type="text" id="link" name="link" @bind="LinkValue" />
+<button type="button" disabled="@string.IsNullOrEmpty(LinkValue)" @onclick="CopyLink">Copy</button>
+
+@code {
+    private bool _fileSelected;
+    private IBrowserFile? _selectedFile;
+    private string LinkValue { get; set; } = string.Empty;
+    
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _fileSelected = _selectedFile != null;
+    }
+    
+    private async Task CopyLink()
+    {
+        if (!string.IsNullOrEmpty(LinkValue))
+        {
+            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", LinkValue);
+        }
+    }
+    
+    private async Task UploadFile()
+    {
+        if (_selectedFile != null)
+        {
+            LinkValue = String.Empty;
+            
+            var httpClient = clientFactory.CreateClient();
+            httpClient.Timeout = TimeSpan.FromMinutes(5);
+            
+            var fileSharingEndpointHealthUrl = configuration["Urls:FileSharingEndpointHealth"];
+            if (fileSharingEndpointHealthUrl == null)
+            {
+                logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
+                return;
+            }
+                
+            var uploadEndHealthRequest = new HttpRequestMessage
+            {
+                Method = HttpMethod.Get,
+                RequestUri = new Uri(fileSharingEndpointHealthUrl),
+            };
+                
+            using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
+            if (uploadEndHealthResponse.IsSuccessStatusCode == false)
+            {
+                logger.LogWarning("File sharing endpoint is down");
+                return;
+            }
+            
+            var authServer = configuration["Urls:AuthServer"];
+            var clientId = configuration["ClientConfiguration:ClientId"];
+            var clientSecret = configuration["ClientConfiguration:ClientSecret"];
+
+            if ((authServer != null && clientId != null && clientSecret != null) == false)
+            {
+                logger.LogWarning("Unable to authorize the bot");
+                return;
+            }
+
+            var authData = await GetAuthData(httpClient, authServer, clientId, clientSecret);
+            if (authData == null)
+            {
+                logger.LogWarning("Unable to authorize the bot");
+                return;
+            }
+            
+            var fileSharingEndpointUrl = configuration["Urls:FileSharingEndpoint"];
+            if (fileSharingEndpointUrl == null)
+            {
+                logger.LogWarning("Unable to get the file sharing endpoint url");
+                return;
+            }
+            
+            var uploadFileRequest = new HttpRequestMessage
+            {
+                Method = HttpMethod.Post,
+                RequestUri = new Uri(fileSharingEndpointUrl),
+                Headers =
+                {
+                    { "Authorization", $"Bearer {authData.AccessToken}" },
+                },
+            };
+
+            var content = new MultipartFormDataContent();
+            
+            await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100_000_000);
+            using var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            var fileBytes = memoryStream.ToArray();
+            
+            var fileContent = new ByteArrayContent(fileBytes);
+            fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
+            content.Add(fileContent, "file", _selectedFile.Name);
+            uploadFileRequest.Content = content;
+                
+            using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
+            if (uploadFileResponse.IsSuccessStatusCode == false)
+            {
+                logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
+                return;
+            }
+                
+            var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
+            if (string.IsNullOrEmpty(uploadResultStr))
+            {
+                logger.LogWarning("Unable to get upload data from file sharing server");
+                return;
+            }
+            
+            var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
+            if (uploadData == null)
+            {
+                logger.LogWarning("Unable to get upload data from file sharing server");
+                return;
+            }
+
+            LinkValue = uploadData.FileUrl;
+        }
+    }
+    
+    private async Task<AuthData?> GetAuthData(HttpClient httpClient, string authServer, string clientId,
+        string clientSecret)
+    {
+        try
+        {
+            var authRequest = new HttpRequestMessage
+            {
+                Method = HttpMethod.Post,
+                RequestUri = new Uri(authServer),
+                Content = new FormUrlEncodedContent(new Dictionary<string, string>
+                {
+                    { "grant_type", "client_credentials" },
+                    { "client_id", clientId },
+                    { "client_secret", clientSecret },
+                })
+            };
+            using var authResponse = await httpClient.SendAsync(authRequest);
+            if (authResponse.IsSuccessStatusCode == false)
+            {
+                return null;
+            }
+
+            var authStr = await authResponse.Content.ReadAsStringAsync();
+
+            if (string.IsNullOrEmpty(authStr))
+            {
+                return null;
+            }
+
+            return JsonSerializer.Deserialize<AuthData>(authStr);
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "Error while getting the auth data");
+            return null;
+        }
+    }
+}
