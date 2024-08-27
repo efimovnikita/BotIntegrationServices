@@ -4,6 +4,57 @@
   },
   "Routes": [
     {
+      "UpstreamPathTemplate": "/api/gateway/audio/v1/translate/status{everything}",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/translation/status{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__AudioEndpoint}",
+          "Port": 8080
+        }
+      ]
+    },
+    {
+      "UpstreamPathTemplate": "/api/gateway/audio/v1/health",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/healthcheck",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__AudioEndpoint}",
+          "Port": 8080
+        }
+      ],
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 25
+      }
+    },
+    {
+      "UpstreamPathTemplate": "/api/gateway/audio/v1/translate/to-english",
+      "UpstreamHttpMethod": [ "Post" ],
+      "DownstreamPathTemplate": "/api/translation/to-english",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__AudioEndpoint}",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      },
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 5
+      }
+    },
+    {
       "UpstreamPathTemplate": "/api/gateway/files-share/v1/uploads/{everything}",
       "UpstreamHttpMethod": [ "Get" ],
       "DownstreamPathTemplate": "/uploads/{everything}",
