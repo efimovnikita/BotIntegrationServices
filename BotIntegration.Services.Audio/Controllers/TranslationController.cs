@@ -77,11 +77,11 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         context?.SetJobParameter(JobParameterName, result);
     }
     
-    [HttpGet("status/{jobId}")]
-    public IActionResult GetStatus(string jobId)
+    [HttpGet("status")]
+    public IActionResult GetStatus([FromQuery] string id)
     {
         using var connection = JobStorage.Current.GetConnection();
-        var job = connection.GetJobData(jobId);
+        var job = connection.GetJobData(id);
         if (job == null)
         {
             return NotFound("Job not found");
@@ -92,7 +92,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
 
         if (status == "Succeeded")
         {
-            var serializedResult = connection.GetJobParameter(jobId, JobParameterName);
+            var serializedResult = connection.GetJobParameter(id, JobParameterName);
             if (!string.IsNullOrEmpty(serializedResult))
             {
                 translationResult = JsonSerializer.Deserialize<string>(serializedResult);
