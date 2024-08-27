@@ -11,7 +11,8 @@ namespace BotIntegration.Services.Audio.Controllers;
 [Route("api/[controller]")]
 public class TranslationController(IBackgroundJobClient backgroundJobClient, ILogger<TranslationController> logger) : ControllerBase
 {
-    private const string JobParameterName = "TranslationResult";
+    private const string JobResultParameterName = "TranslationResult";
+    private const string JobExceptionParameterName = "ExceptionMessage";
 
     [HttpPost("to-english")]
     [DisableRequestSizeLimit]
@@ -76,7 +77,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         {
             var task = EncodeAndSendToOpenAi(openaiApiKey, prompt, sizeInMegabytes, filePath);
             var result = task.Result;
-            context?.SetJobParameter(JobParameterName, result);
+            context?.SetJobParameter(JobResultParameterName, result);
             
             if (string.IsNullOrEmpty(result))
             {
@@ -86,6 +87,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         catch (Exception e)
         {
             logger.LogError(e, "An error occurred during the background translation process");
+            context?.SetJobParameter(JobExceptionParameterName, e.Message);
         }
     }
     
@@ -101,17 +103,30 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
 
         var status = job.State;
         var translationResult = "";
-
+        var errorMessage = "";
+        
         if (status == "Succeeded")
         {
-            var serializedResult = connection.GetJobParameter(id, JobParameterName);
+            var serializedResult = connection.GetJobParameter(id, JobResultParameterName);
             if (!string.IsNullOrEmpty(serializedResult))
             {
                 translationResult = JsonSerializer.Deserialize<string>(serializedResult);
             }
         }
+        else if (status == "Failed")
+        {
+            var exceptionDetails = connection.GetJobParameter(id, JobExceptionParameterName);
+            if (!string.IsNullOrEmpty(exceptionDetails))
+            {
+                errorMessage = exceptionDetails;
+            }
+            else
+            {
+                errorMessage = "An unknown error occurred during processing.";
+            }
+        }
 
-        return Ok(new { Status = status, Result = translationResult });
+        return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
     }
 
     private async Task<string> EncodeAndSendToOpenAi(string openaiApiKey, string? prompt, double sizeInMegabytes,
