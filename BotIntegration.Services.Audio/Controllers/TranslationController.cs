@@ -72,9 +72,21 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
 
     public void PerformTranslation(string openaiApiKey, string? prompt, double sizeInMegabytes, string filePath, PerformContext? context)
     {
-        var task = EncodeAndSendToOpenAi(openaiApiKey, prompt, sizeInMegabytes, filePath);
-        var result = task.Result;
-        context?.SetJobParameter(JobParameterName, result);
+        try
+        {
+            var task = EncodeAndSendToOpenAi(openaiApiKey, prompt, sizeInMegabytes, filePath);
+            var result = task.Result;
+            context?.SetJobParameter(JobParameterName, result);
+            
+            if (string.IsNullOrEmpty(result))
+            {
+                throw new InvalidOperationException("Translation failed or returned an empty result");
+            }
+        }
+        catch (Exception e)
+        {
+            logger.LogError(e, "An error occurred during the background translation process");
+        }
     }
     
     [HttpGet("status")]
@@ -105,56 +117,66 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
     private async Task<string> EncodeAndSendToOpenAi(string openaiApiKey, string? prompt, double sizeInMegabytes,
         string filePath)
     {
-        if (sizeInMegabytes >=24.5)
+        try
         {
-            // need to encode in order to reduce the size
-            var uniqueFileNameForOutput = Guid.NewGuid() + ".ogg";
-
-            // ffmpeg -i "D:\Downloads\6be47c54-29de-4338-9d63-37e9c54050f0.mp3" -vn -map_metadata -1 -ac 1 -c:a libopus -b:a 12k -application voip audio.ogg
-            var result = await Cli.Wrap("ffmpeg")
-                .WithArguments(["-i", $"{filePath}", "-vn", "-map_metadata", "-1", "-ac", "1", "-c:a", "libopus", "-b:a", "12k", "-application", "voip", $"{uniqueFileNameForOutput}"])
-                .WithWorkingDirectory(Path.GetTempPath())
-                .ExecuteAsync();
-                
-            logger.LogInformation("Encoding result: {Result}", result.ExitCode);
-                
-            if (result.ExitCode != 0)
+            if (sizeInMegabytes >= 24.5)
             {
-                logger.LogWarning("File encoding result was unsuccessful");
-                return "";
+                // need to encode in order to reduce the size
+                var uniqueFileNameForOutput = Guid.NewGuid() + ".ogg";
+
+                var result = await Cli.Wrap("ffmpeg")
+                    .WithArguments([
+                        "-i", $"{filePath}", "-vn", "-map_metadata", "-1", "-ac", "1", "-c:a", "libopus", "-b:a", "12k",
+                        "-application", "voip", $"{uniqueFileNameForOutput}"
+                    ])
+                    .WithWorkingDirectory(Path.GetTempPath())
+                    .ExecuteAsync();
+
+                logger.LogInformation("Encoding result: {Result}", result.ExitCode);
+
+                if (result.ExitCode != 0)
+                {
+                    logger.LogWarning("File encoding result was unsuccessful");
+                    return "";
+                }
+
+                var encodedFilePath = Path.Combine(Path.GetTempPath(), uniqueFileNameForOutput);
+                if (System.IO.File.Exists(encodedFilePath) == false)
+                {
+                    logger.LogWarning("Error getting the encoded file");
+                    return "";
+                }
+
+                var encodedFileInfo = new FileInfo(encodedFilePath);
+                var encodedFileLengthInMbs = (double)encodedFileInfo.Length / (1024 * 1024);
+                if (encodedFileLengthInMbs >= 24.5)
+                {
+                    logger.LogWarning("Encoded file is too big");
+                    return "";
+                }
+
+                filePath = encodedFilePath;
             }
 
-            var encodedFilePath = Path.Combine(Path.GetTempPath(),uniqueFileNameForOutput);
-            if (System.IO.File.Exists(encodedFilePath) == false)
-            {
-                logger.LogWarning("Error getting the encoded file");
-                return "";
-            }
+            logger.LogInformation("This file will be send to OpenAI: {Path}", filePath);
 
-            var encodedFileInfo = new FileInfo(encodedFilePath);
-            double encodedFileLengthInMbs = (double)encodedFileInfo.Length / (1024 * 1024);
-            if (encodedFileLengthInMbs >= 24.5)
-            {
-                logger.LogWarning("Encoded file is too big");
-                return "";
-            }
+            AudioClient client = new(model: "whisper-1", openaiApiKey);
 
-            filePath = encodedFilePath;
+            AudioTranslationOptions options = new()
+            {
+                Prompt = string.IsNullOrWhiteSpace(prompt) == false ? prompt : "",
+                ResponseFormat = AudioTranslationFormat.Verbose
+            };
+
+            var translationResult = await client.TranslateAudioAsync(filePath, options);
+            var text = translationResult.Value.Text;
+
+            return text;
         }
-            
-        logger.LogInformation("This file will be send to OpenAI: {Path}", filePath);
-            
-        AudioClient client = new(model: "whisper-1", openaiApiKey);
-
-        AudioTranslationOptions options = new()
+        catch (Exception e)
         {
-            Prompt = string.IsNullOrWhiteSpace(prompt) == false ? prompt : "",
-            ResponseFormat = AudioTranslationFormat.Verbose
-        };
-
-        var translationResult = await client.TranslateAudioAsync(filePath, options);
-        var text = translationResult.Value.Text;
-        
-        return text;
+            logger.LogError(e, "An error occurred while encoding and sending the file to OpenAI");
+            return "";
+        }
     }
 }
