@@ -3,6 +3,7 @@ using CliWrap;
 using Hangfire;
 using Hangfire.Server;
 using Microsoft.AspNetCore.Mvc;
+using OpenAI;
 using OpenAI.Audio;
 
 namespace BotIntegration.Services.Audio.Controllers;
@@ -176,7 +177,8 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
 
         logger.LogInformation("This file will be send to OpenAI: {Path}", filePath);
 
-        AudioClient client = new(model: "whisper-1", openaiApiKey);
+        AudioClient client = new(model: "whisper-1", openaiApiKey,
+            options: new OpenAIClientOptions { NetworkTimeout = TimeSpan.FromMinutes(10) });
 
         AudioTranslationOptions options = new()
         {
