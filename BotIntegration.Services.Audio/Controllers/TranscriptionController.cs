@@ -9,13 +9,13 @@ namespace BotIntegration.Services.Audio.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class TranslationController(IBackgroundJobClient backgroundJobClient, ILogger<TranslationController> logger) : ControllerBase
+public class TranscriptionController(IBackgroundJobClient backgroundJobClient, ILogger<TranscriptionController> logger) : ControllerBase
 {
 
-    [HttpPost("to-english")]
+    [HttpPost("get-text")]
     [DisableRequestSizeLimit]
     [RequestFormLimits(MultipartBodyLengthLimit = Shared.LengthLimit, ValueLengthLimit = Shared.LengthLimit)]
-    public async Task<IActionResult> GetTranslation([FromForm] IFormFile audioFile, [FromForm] string openaiApiKey, [FromForm] string? prompt)
+    public async Task<IActionResult> GetTranscription([FromForm] IFormFile audioFile, [FromForm] string openaiApiKey, [FromForm] string? prompt)
     {
         try
         {
@@ -64,8 +64,8 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "An error occurred while translating the audio.");
-            return StatusCode(500, "An error occurred while translating the audio");
+            logger.LogError(ex, "An error occurred while transcribing the audio.");
+            return StatusCode(500, "An error occurred while transcribing the audio");
         }
     }
 
@@ -80,12 +80,12 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
             
             if (string.IsNullOrEmpty(result))
             {
-                throw new InvalidOperationException("Translation failed or returned an empty result");
+                throw new InvalidOperationException("Transcription failed or returned an empty result");
             }
         }
         catch (Exception e)
         {
-            logger.LogError(e, "An error occurred during the background translation process");
+            logger.LogError(e, "An error occurred during the background transcription process");
             context?.SetJobParameter(Shared.JobExceptionParameterName, e.Message);
 
             throw;
@@ -103,7 +103,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         }
 
         var status = job.State;
-        var translationResult = "";
+        var result = "";
         var errorMessage = "";
         
         switch (status)
@@ -113,7 +113,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
                 var serializedResult = connection.GetJobParameter(id, Shared.JobResultParameterName);
                 if (!string.IsNullOrEmpty(serializedResult))
                 {
-                    translationResult = JsonSerializer.Deserialize<string>(serializedResult);
+                    result = JsonSerializer.Deserialize<string>(serializedResult);
                 }
 
                 break;
@@ -129,7 +129,7 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
             }
         }
 
-        return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
+        return Ok(new { Status = status, Result = result, Error = errorMessage });
     }
 
     private async Task<string> EncodeAndSendToOpenAi(string openaiApiKey, string? prompt, double sizeInMegabytes,
@@ -146,14 +146,15 @@ public class TranslationController(IBackgroundJobClient backgroundJobClient, ILo
         AudioClient client = new(model: Shared.ModelName, openaiApiKey,
             options: new OpenAIClientOptions { NetworkTimeout = Shared.Timeout });
 
-        AudioTranslationOptions options = new()
+        AudioTranscriptionOptions options = new()
         {
             Prompt = string.IsNullOrWhiteSpace(prompt) == false ? prompt : "",
-            ResponseFormat = AudioTranslationFormat.Verbose
+            ResponseFormat = AudioTranscriptionFormat.Verbose,
+            Granularities = AudioTimestampGranularities.Word | AudioTimestampGranularities.Segment,
         };
 
-        var translationResult = await client.TranslateAudioAsync(filePath, options);
-        var text = translationResult.Value.Text;
+        var result = await client.TranscribeAudioAsync(filePath, options);
+        var text = result.Value.Text;
 
         return text;
     }
