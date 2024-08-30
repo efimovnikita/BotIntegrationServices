@@ -1,3 +1,4 @@
+using Blazored.LocalStorage;
 using BotIntegration.Services.FileSharing.FrontEnd.Components;
 using Serilog;
 
@@ -26,6 +27,7 @@ try
     builder.Services.AddRazorComponents()
         .AddInteractiveServerComponents();
 
+    builder.Services.AddBlazoredLocalStorage();
     builder.Services.AddHttpClient();
 
     var app = builder.Build();

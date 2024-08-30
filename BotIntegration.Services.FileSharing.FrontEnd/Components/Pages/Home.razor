@@ -1,11 +1,13 @@
 ﻿@page "/"
 @using System.Net.Http.Headers
 @using System.Text.Json
+@using Blazored.LocalStorage
 @using BotIntegration.Services.FileSharing.FrontEnd.Components.Models
 @inject IHttpClientFactory ClientFactory
 @inject IConfiguration Configuration
 @inject ILogger<Home> Logger
 @inject IJSRuntime JsRuntime
+@inject ILocalStorageService LocalStorage
 
 <PageTitle>Upload a file and get the link</PageTitle>
 
@@ -70,13 +72,26 @@
 </div>
 
 @code {
+    private const string Key = "secret";
     private bool _fileSelected;
     private IBrowserFile? _selectedFile;
     private string LinkValue { get; set; } = string.Empty;
     private string ClientSecret { get; set; } = string.Empty;
     private bool ShowTooltip { get; set; }
     private bool IsUploading { get; set; }
-    
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var secret = await LocalStorage.GetItemAsStringAsync(Key);
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            return;
+        }
+
+        ClientSecret = secret;
+        StateHasChanged();
+    }
+
     private void HandleFileSelected(InputFileChangeEventArgs e)
     {
         _selectedFile = e.File;
@@ -143,10 +158,12 @@
                     return;
                 }
 
+                await LocalStorage.SetItemAsStringAsync(Key, ClientSecret);
+
                 var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
                 if (authData == null)
                 {
-                    Logger.LogWarning("Unable to authorize the bot");
+                    Logger.LogWarning("Unable to authorize");
                     return;
                 }
 
