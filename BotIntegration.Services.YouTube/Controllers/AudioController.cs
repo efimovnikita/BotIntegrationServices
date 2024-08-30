@@ -16,7 +16,7 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
 {
     private const string Result = "Result";
     private const string ExceptionMessage = "ExceptionMessage";
-    private const int GlobalTrackCountLimit = 50;
+    private const int GlobalTrackCountLimit = 30;
 
     [HttpGet]
     public async Task<IActionResult> Get([FromQuery] string videoUrl)
