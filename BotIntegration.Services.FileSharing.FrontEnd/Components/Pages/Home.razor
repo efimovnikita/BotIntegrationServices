@@ -2,10 +2,10 @@
 @using System.Net.Http.Headers
 @using System.Text.Json
 @using BotIntegration.Services.FileSharing.FrontEnd.Components.Models
-@inject IHttpClientFactory clientFactory
-@inject IConfiguration configuration
-@inject ILogger<Home> logger
-@inject IJSRuntime JSRuntime
+@inject IHttpClientFactory ClientFactory
+@inject IConfiguration Configuration
+@inject ILogger<Home> Logger
+@inject IJSRuntime JsRuntime
 
 <PageTitle>Upload a file and get the link</PageTitle>
 
@@ -87,7 +87,7 @@
     {
         if (!string.IsNullOrEmpty(LinkValue))
         {
-            await JSRuntime.InvokeVoidAsync("navigator.clipboard.writeText", LinkValue);
+            await JsRuntime.InvokeVoidAsync("navigator.clipboard.writeText", LinkValue);
             
             // Show tooltip
             ShowTooltip = true;
@@ -111,13 +111,13 @@
             {
                 LinkValue = String.Empty;
 
-                var httpClient = clientFactory.CreateClient();
-                httpClient.Timeout = TimeSpan.FromMinutes(5);
+                var httpClient = ClientFactory.CreateClient();
+                httpClient.Timeout = TimeSpan.FromMinutes(10);
 
-                var fileSharingEndpointHealthUrl = configuration["Urls:FileSharingEndpointHealth"];
+                var fileSharingEndpointHealthUrl = Configuration["Urls:FileSharingEndpointHealth"];
                 if (fileSharingEndpointHealthUrl == null)
                 {
-                    logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
+                    Logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
                     return;
                 }
 
@@ -130,30 +130,30 @@
                 using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
                 if (uploadEndHealthResponse.IsSuccessStatusCode == false)
                 {
-                    logger.LogWarning("File sharing endpoint is down");
+                    Logger.LogWarning("File sharing endpoint is down");
                     return;
                 }
 
-                var authServer = configuration["Urls:AuthServer"];
-                var clientId = configuration["ClientConfiguration:ClientId"];
+                var authServer = Configuration["Urls:AuthServer"];
+                var clientId = Configuration["ClientConfiguration:ClientId"];
 
                 if ((authServer != null && clientId != null && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)
                 {
-                    logger.LogWarning("Unable to authorize the bot");
+                    Logger.LogWarning("Unable to authorize the bot");
                     return;
                 }
 
                 var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
                 if (authData == null)
                 {
-                    logger.LogWarning("Unable to authorize the bot");
+                    Logger.LogWarning("Unable to authorize the bot");
                     return;
                 }
 
-                var fileSharingEndpointUrl = configuration["Urls:FileSharingEndpoint"];
+                var fileSharingEndpointUrl = Configuration["Urls:FileSharingEndpoint"];
                 if (fileSharingEndpointUrl == null)
                 {
-                    logger.LogWarning("Unable to get the file sharing endpoint url");
+                    Logger.LogWarning("Unable to get the file sharing endpoint url");
                     return;
                 }
 
@@ -182,21 +182,21 @@
                 using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
                 if (uploadFileResponse.IsSuccessStatusCode == false)
                 {
-                    logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
+                    Logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
                     return;
                 }
 
                 var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
                 if (string.IsNullOrEmpty(uploadResultStr))
                 {
-                    logger.LogWarning("Unable to get upload data from file sharing server");
+                    Logger.LogWarning("Unable to get upload data from file sharing server");
                     return;
                 }
 
                 var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
                 if (uploadData == null)
                 {
-                    logger.LogWarning("Unable to get upload data from file sharing server");
+                    Logger.LogWarning("Unable to get upload data from file sharing server");
                     return;
                 }
 
@@ -243,7 +243,7 @@
         }
         catch (Exception e)
         {
-            logger.LogError(e, "Error while getting the auth data");
+            Logger.LogError(e, "Error while getting the auth data");
             return null;
         }
     }
