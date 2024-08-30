@@ -1,3 +1,5 @@
+using Hangfire;
+using Hangfire.MemoryStorage;
 using Serilog;
 
 try
@@ -16,6 +18,15 @@ try
         configuration.WriteTo.Console();
         configuration.WriteTo.Seq(builder.Configuration["Urls:LogServer"] ?? string.Empty);
     });
+    
+    builder.Services.AddHangfire(config =>
+    {
+        config.UseMemoryStorage();
+    });
+
+    builder.Services.AddHangfireServer();
+
+    builder.Services.AddHttpClient();
 
     builder.Services.AddControllers();
 
