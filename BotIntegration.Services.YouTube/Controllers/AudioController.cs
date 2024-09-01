@@ -6,7 +6,6 @@ using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
 using Hangfire;
 using Hangfire.Server;
-using YoutubeExplode.Common;
 
 namespace BotIntegration.Services.YouTube.Controllers;
 
@@ -48,21 +47,20 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
             return StatusCode(500, "An internal server error occurred. Please try again later.");
         }
     }
-
-    [HttpGet("get-playlist-archive")]
-    public IActionResult GetPlaylistArchive([FromQuery] string playlistUrl)
+    
+    [HttpPost("get-archive")]
+    public IActionResult GetArchive([FromBody] UrlsRequest request)
     {
         try
         {
-            if (string.IsNullOrWhiteSpace(playlistUrl))
-                throw new ArgumentException("Value cannot be null or whitespace.", nameof(playlistUrl));
+            if (request.Urls == null) throw new ArgumentNullException(nameof(request.Urls));
 
-            if (playlistUrl.StartsWith("https://music.youtube.com/playlist") == false)
+            if (request.Urls.All(url => String.IsNullOrWhiteSpace(url) == false && url.StartsWith("https://music.youtube.com")) == false)
             {
-                return BadRequest("You need to provide an YouTube playlist URL.");
+                return BadRequest("All urls must start with https://music.youtube.com.");
             }
 
-            var jobId = backgroundJobClient.Enqueue(() => PerformJob(playlistUrl, null));
+            var jobId = backgroundJobClient.Enqueue(() => PerformJob(request.Urls, null));
             
             return Ok(new { JobId = jobId });
         }
@@ -73,48 +71,8 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
         }
     }
 
-    [HttpGet("get-playlist-job-status")]
-    public IActionResult GetPlaylistJobStatus([FromQuery] string jobId)
-    {
-        using var connection = JobStorage.Current.GetConnection();
-        var job = connection.GetJobData(jobId);
-        if (job == null)
-        {
-            return NotFound("Job not found");
-        }
-
-        var status = job.State;
-        var translationResult = "";
-        var errorMessage = "";
-        
-        switch (status)
-        {
-            case "Succeeded":
-            {
-                var serializedResult = connection.GetJobParameter(jobId, Result);
-                if (!string.IsNullOrEmpty(serializedResult))
-                {
-                    translationResult = JsonSerializer.Deserialize<string>(serializedResult);
-                }
-
-                break;
-            }
-            case "Failed":
-            {
-                var exceptionDetails = connection.GetJobParameter(jobId, ExceptionMessage);
-                errorMessage = !string.IsNullOrEmpty(exceptionDetails)
-                    ? JsonSerializer.Deserialize<string>(exceptionDetails)
-                    : "An unknown error occurred during processing.";
-
-                break;
-            }
-        }
-
-        return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
-    }
-
     [AutomaticRetry(Attempts = 0)]
-    public async Task PerformJob(string playlistUrl, PerformContext? context)
+    public async Task PerformJob(string[] urls, [FromServices] PerformContext? context)
     {
         var files = new List<string>();
         var tempDirPath = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}");
@@ -126,30 +84,27 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
         {
             var youtube = new YoutubeClient();
 
-            var videos = await youtube.Playlists.GetVideosAsync(playlistUrl);
-            logger.LogInformation("Retrieving playlist videos...");
-            
-            if (videos.Count > GlobalTrackCountLimit)
+            if (urls.Length > GlobalTrackCountLimit)
             {
-                logger.LogWarning("Playlist exceeds limit. Truncating to {Limit} videos.", GlobalTrackCountLimit);
-                videos = videos.Take(GlobalTrackCountLimit).ToList();
+                logger.LogWarning("Urls count exceeds limit. Truncating to {Limit} limit.", GlobalTrackCountLimit);
+                urls = urls.Take(GlobalTrackCountLimit).ToArray();
             }
 
-            logger.LogInformation("Getting playlist videos...");
             const int chunkSize = 3;
             var random = new Random();
-            for (var i = 0; i < videos.Count; i += chunkSize)
+            for (var i = 0; i < urls.Length; i += chunkSize)
             {
-                var videoChunk = videos.Skip(i).Take(chunkSize);
-                var downloadTasks = videoChunk.Select(async video =>
+                var videoChunk = urls.Skip(i).Take(chunkSize);
+                var downloadTasks = videoChunk.Select(async url =>
                 {
-                    var url = video.Url;
                     var manifest = await youtube.Videos.Streams.GetManifestAsync(url);
                     var streamInfo = manifest.GetAudioOnlyStreams().TryGetWithHighestBitrate();
                     if (streamInfo == null)
                     {
                         return string.Empty;
                     }
+                    
+                    var video = await youtube.Videos.GetAsync(url);
 
                     // Sanitize the video title by replacing invalid filename characters with underscores
                     var sanitizedTitle = string.Join("_", video.Title.Split(Path.GetInvalidFileNameChars()));
@@ -195,9 +150,9 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
                 files.AddRange(downloadedFiles.Where(f => !string.IsNullOrEmpty(f)));
 
                 // Add a random delay between chunks
-                if (i + chunkSize < videos.Count)
+                if (i + chunkSize < urls.Length)
                 {
-                    var delay = random.Next(1000, 5000); // Random delay between 1 to 5 seconds
+                    var delay = random.Next(1000, 5000);
                     logger.LogInformation("Waiting for {Delay} ms before processing next chunk", delay);
                     await Task.Delay(delay);
                 }
@@ -243,6 +198,46 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
                 System.IO.File.Delete(zipPath);
             }
         }
+    }
+
+    [HttpGet("get-status")]
+    public IActionResult GetPlaylistJobStatus([FromQuery] string jobId)
+    {
+        using var connection = JobStorage.Current.GetConnection();
+        var job = connection.GetJobData(jobId);
+        if (job == null)
+        {
+            return NotFound("Job not found");
+        }
+
+        var status = job.State;
+        var translationResult = "";
+        var errorMessage = "";
+        
+        switch (status)
+        {
+            case "Succeeded":
+            {
+                var serializedResult = connection.GetJobParameter(jobId, Result);
+                if (!string.IsNullOrEmpty(serializedResult))
+                {
+                    translationResult = JsonSerializer.Deserialize<string>(serializedResult);
+                }
+
+                break;
+            }
+            case "Failed":
+            {
+                var exceptionDetails = connection.GetJobParameter(jobId, ExceptionMessage);
+                errorMessage = !string.IsNullOrEmpty(exceptionDetails)
+                    ? JsonSerializer.Deserialize<string>(exceptionDetails)
+                    : "An unknown error occurred during processing.";
+
+                break;
+            }
+        }
+
+        return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
     }
     
     private async Task<AuthData?> GetAuthData(HttpClient httpClient, string authServer, string clientId,
