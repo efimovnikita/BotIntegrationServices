@@ -1,17 +1,22 @@
-﻿using System.Net.Http.Headers;
-using System.Text.Json;
+﻿using System.Text.Json;
 using BotIntegration.Services.YouTube.Models;
 using Microsoft.AspNetCore.Mvc;
 using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
 using Hangfire;
 using Hangfire.Server;
+using Refit;
 
 namespace BotIntegration.Services.YouTube.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<AudioController> logger, IConfiguration configuration, IHttpClientFactory clientFactory) : ControllerBase
+public class AudioController(
+    IBackgroundJobClient backgroundJobClient,
+    ILogger<AudioController> logger,
+    IConfiguration configuration, 
+    IFileSharingApi fileSharingApi,
+    IAuthApi authApi) : ControllerBase
 {
     private const string Result = "Result";
     private const string ExceptionMessage = "ExceptionMessage";
@@ -239,154 +244,31 @@ public class AudioController(IBackgroundJobClient backgroundJobClient, ILogger<A
 
         return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
     }
-    
-    private async Task<AuthData?> GetAuthData(HttpClient httpClient, string authServer, string clientId,
-        string clientSecret)
-    {
-        try
-        {
-            var authRequest = new HttpRequestMessage
-            {
-                Method = HttpMethod.Post,
-                RequestUri = new Uri(authServer),
-                Content = new FormUrlEncodedContent(new Dictionary<string, string>
-                {
-                    { "grant_type", "client_credentials" },
-                    { "client_id", clientId },
-                    { "client_secret", clientSecret },
-                })
-            };
-            using var authResponse = await httpClient.SendAsync(authRequest);
-            if (authResponse.IsSuccessStatusCode == false)
-            {
-                return null;
-            }
-
-            var authStr = await authResponse.Content.ReadAsStringAsync();
-
-            if (string.IsNullOrEmpty(authStr))
-            {
-                return null;
-            }
-
-            return JsonSerializer.Deserialize<AuthData>(authStr);
-        }
-        catch (Exception e)
-        {
-            logger.LogError(e, "Error while getting the auth data");
-            return null;
-        }
-    }
 
     private async Task<UploadData> UploadZipFile(string zipPath)
     {
         logger.LogInformation("Starting UploadZipFile method with zipPath: {ZipPath}", zipPath);
 
-        var httpClient = clientFactory.CreateClient();
-        httpClient.Timeout = TimeSpan.FromMinutes(10);
-
-        await CheckFileSharingEndpointHealth(httpClient);
-
-        var authServer = configuration["Urls:AuthServer"];
-        var clientId = configuration["Configuration:ClientId"];
-        var clientSecret = configuration["Configuration:ClientSecret"];
-
-        if ((authServer != null && clientId != null && clientSecret != null) == false)
-        {
-            logger.LogWarning("Auth server parameter is missing.");
-            throw new Exception("Authentication server configuration is invalid.");
-        }
+        await fileSharingApi.CheckHealth();
 
         logger.LogDebug("Attempting to retrieve auth data");
-        var authData = await GetAuthData(httpClient, authServer, clientId, clientSecret);
-        if (authData == null)
-        {
-            logger.LogWarning("Auth data could not be retrieved.");
-            throw new Exception($"Authentication server returned an unauthorized response.");
-        }
-        logger.LogInformation("Auth data retrieved successfully");
+        
+        var data = new Dictionary<string, string> {
+            { IAuthApi.GrantType, IAuthApi.ClientCredentials },
+            { IAuthApi.ClientId, configuration["Configuration:ClientId"] ?? "" },
+            { IAuthApi.ClientSecret, configuration["Configuration:ClientSecret"] ?? "" }
+        };
 
-        var uploadData = await UploadFileToFileSharingService(httpClient, authData, zipPath);
+        var authData = await authApi.GetAuthData(data);
+        
+        logger.LogInformation("Auth data retrieved successfully");
+        
+        var fileStream = System.IO.File.OpenRead(zipPath);
+        var streamPart = new StreamPart(fileStream, Path.GetFileName(zipPath), "multipart/form-data");
+
+        var uploadData = await fileSharingApi.UploadFile($"Bearer {authData.AccessToken}", streamPart);
 
         logger.LogInformation("File upload successful. UploadData: {@UploadData}", uploadData);
-        return uploadData;
-    }
-
-    private async Task CheckFileSharingEndpointHealth(HttpClient httpClient)
-    {
-        var fileSharingEndpointHealthUrl = configuration["Urls:FileSharingEndpointHealth"];
-        if (fileSharingEndpointHealthUrl == null)
-        {
-            logger.LogWarning("FileSharingEndpointHealthUrl parameter is missing.");
-            throw new Exception("Unable to determine the health status of the file sharing endpoint");
-        }
-
-        var uploadEndHealthRequest = new HttpRequestMessage
-        {
-            Method = HttpMethod.Get,
-            RequestUri = new Uri(fileSharingEndpointHealthUrl),
-        };
-
-        logger.LogDebug("Sending health check request to {Url}", fileSharingEndpointHealthUrl);
-        using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
-        if (uploadEndHealthResponse.IsSuccessStatusCode == false)
-        {
-            logger.LogError("Health check failed with status code {StatusCode}", uploadEndHealthResponse.StatusCode);
-            throw new Exception(
-                $"The upload endpoint health response status code {uploadEndHealthResponse.StatusCode}");
-        }
-        logger.LogInformation("Health check successful");
-    }
-
-    private async Task<UploadData> UploadFileToFileSharingService(HttpClient httpClient, AuthData authData, string zipPath)
-    {
-        var fileSharingEndpointUrl = configuration["Urls:FileSharingEndpoint"];
-        if (fileSharingEndpointUrl == null)
-        {
-            logger.LogWarning("FileSharingEndpointUrl parameter is missing.");
-            throw new Exception("Unable to determine the health status of the file sharing endpoint");
-        }
-
-        var uploadFileRequest = new HttpRequestMessage
-        {
-            Method = HttpMethod.Post,
-            RequestUri = new Uri(fileSharingEndpointUrl),
-            Headers =
-            {
-                { "Authorization", $"Bearer {authData.AccessToken}" },
-            }
-        };
-
-        var content = new MultipartFormDataContent();
-        var fileBytes = await System.IO.File.ReadAllBytesAsync(zipPath);
-        var fileContent = new ByteArrayContent(fileBytes);
-        fileContent.Headers.ContentType = MediaTypeHeaderValue.Parse("multipart/form-data");
-        content.Add(fileContent, "file", Path.GetFileName(zipPath));
-        uploadFileRequest.Content = content;
-
-        logger.LogDebug("Sending file upload request to {Url}", fileSharingEndpointUrl);
-        using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
-        if (uploadFileResponse.IsSuccessStatusCode == false)
-        {
-            logger.LogError("File upload failed with status code {StatusCode}", uploadFileResponse.StatusCode);
-            throw new Exception($"The upload endpoint response status code {uploadFileResponse.StatusCode}");
-        }
-
-        var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
-        if (string.IsNullOrEmpty(uploadResultStr))
-        {
-            logger.LogWarning("Upload data could not be retrieved.");
-            throw new Exception("Unable to get upload data from file sharing server");
-        }
-
-        logger.LogDebug("Attempting to deserialize upload data");
-        var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
-        if (uploadData == null)
-        {
-            logger.LogWarning("Upload data could not be deserialized.");
-            throw new Exception("Unable to parse upload data from file sharing server");
-        }
-
         return uploadData;
     }
 }

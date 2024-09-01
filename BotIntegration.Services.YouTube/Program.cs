@@ -1,6 +1,8 @@
+using BotIntegration.Services.YouTube.Models;
 using Hangfire;
 using Hangfire.MemoryStorage;
 using Serilog;
+using Refit;
 
 try
 {
@@ -25,8 +27,12 @@ try
     });
 
     builder.Services.AddHangfireServer();
-
-    builder.Services.AddHttpClient();
+    
+    builder.Services.AddRefitClient<IFileSharingApi>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(builder.Configuration["Urls:GatewayBaseAddress"] ?? ""));
+    
+    builder.Services.AddRefitClient<IAuthApi>()
+        .ConfigureHttpClient(client => client.BaseAddress = new Uri(builder.Configuration["Urls:AuthGatewayBaseAddress"] ?? ""));
 
     builder.Services.AddControllers();
 
