@@ -60,9 +60,11 @@ public class AudioController(
         {
             if (request.Urls == null) throw new ArgumentNullException(nameof(request.Urls));
 
-            if (request.Urls.All(url => String.IsNullOrWhiteSpace(url) == false && url.StartsWith("https://music.youtube.com")) == false)
+            if (request.Urls.All(url =>
+                    string.IsNullOrWhiteSpace(url) == false && (url.StartsWith("https://music.youtube.com") ||
+                                                                url.StartsWith("https://www.youtube.com"))) == false)
             {
-                return BadRequest("All urls must start with https://music.youtube.com.");
+                return BadRequest("All urls must start with https://music.youtube.com or with https://www.youtube.com");
             }
 
             var jobId = backgroundJobClient.Enqueue(() => PerformJob(request.Urls, null));
