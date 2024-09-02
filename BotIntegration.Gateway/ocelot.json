@@ -168,7 +168,7 @@
     {
       "UpstreamPathTemplate": "/api/gateway/youtube/v1/health",
       "UpstreamHttpMethod": [ "Get" ],
-      "DownstreamPathTemplate": "/api/healthcheck",
+      "DownstreamPathTemplate": "/api/health",
       "DownstreamScheme": "http",
       "DownstreamHostAndPorts": [
         {

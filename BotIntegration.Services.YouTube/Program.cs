@@ -36,9 +36,13 @@ try
 
     builder.Services.AddControllers();
 
+    builder.Services.AddHealthChecks();
+
     var app = builder.Build();
 
     app.MapControllers();
+
+    app.MapHealthChecks("/api/health");
 
     app.Run();
 }

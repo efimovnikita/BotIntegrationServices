@@ -8,6 +8,7 @@
     </PropertyGroup>
 
     <ItemGroup>
+        <PackageReference Include="AspNetCore.HealthChecks.UI.Client" Version="8.0.1" />
         <PackageReference Include="Refit" Version="7.1.2" />
         <PackageReference Include="Refit.HttpClientFactory" Version="7.1.2" />
         <PackageReference Include="Serilog.AspNetCore" Version="8.0.2" />
