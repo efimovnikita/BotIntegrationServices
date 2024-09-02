@@ -188,7 +188,7 @@ public class AudioController(
         }
         catch (Exception e)
         {
-            logger.LogError(e, "An error occurred during the background translation process");
+            logger.LogError(e, "An error occurred during the background process");
             context?.SetJobParameter(ExceptionMessage, e.Message);
 
             throw;
@@ -218,7 +218,7 @@ public class AudioController(
         }
 
         var status = job.State;
-        var translationResult = "";
+        var result = "";
         var errorMessage = "";
         
         switch (status)
@@ -228,7 +228,7 @@ public class AudioController(
                 var serializedResult = connection.GetJobParameter(jobId, Result);
                 if (!string.IsNullOrEmpty(serializedResult))
                 {
-                    translationResult = JsonSerializer.Deserialize<string>(serializedResult);
+                    result = JsonSerializer.Deserialize<string>(serializedResult);
                 }
 
                 break;
@@ -244,7 +244,7 @@ public class AudioController(
             }
         }
 
-        return Ok(new { Status = status, Result = translationResult, Error = errorMessage });
+        return Ok(new { Status = status, Result = result, Error = errorMessage });
     }
 
     private async Task<UploadData> UploadZipFile(string zipPath)
