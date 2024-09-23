@@ -1,6 +1,9 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{4FCD8132-B437-4C95-B606-5A6C2D52811B}"
+	ProjectSection(SolutionItems) = preProject
+		http-client.private.env.json = http-client.private.env.json
+	EndProjectSection
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Gateway", "Gateway", "{3997720D-FF47-4020-9E28-27F8F27283AE}"
 EndProject
