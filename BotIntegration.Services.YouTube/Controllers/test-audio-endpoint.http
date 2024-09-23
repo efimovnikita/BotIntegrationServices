@@ -1,0 +1,16 @@
+﻿### Get Auth Token
+POST {{identity}}/realms/botintegration/protocol/openid-connect/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials&client_id={{client_id}}&client_secret={{client_secret}}
+> {% client.global.set("access_token", response.body.access_token) %}
+
+### Test Get Audio Endpoint (split audio)
+GET {{gateway}}/api/gateway/youtube/v1/audio/get-split-audio?videoUrl=https://youtu.be/DreKvN6d6W8?si=De4dUI8K_kChNaQe&startTime=00:00:00&endTime=00:00:10
+Accept: audio/mp3
+Authorization: Bearer {{access_token}}
+
+### Test Get Audio Endpoint
+GET {{gateway}}/api/gateway/youtube/v1/audio?videoUrl=https://youtu.be/DreKvN6d6W8?si=De4dUI8K_kChNaQe
+Accept: audio/mp3
+Authorization: Bearer {{access_token}}

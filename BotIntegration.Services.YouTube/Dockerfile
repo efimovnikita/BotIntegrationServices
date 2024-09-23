@@ -1,5 +1,10 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 
+# Install FFmpeg
+RUN apt-get update && \
+    apt-get install -y ffmpeg && \
+    rm -rf /var/lib/apt/lists/*
+
 RUN addgroup --gid 1000 appgroup && \
     adduser --uid 1000 --ingroup appgroup --disabled-password --gecos "" appuser
 

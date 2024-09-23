@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Diagnostics;
+using System.Text.Json;
 using BotIntegration.Services.YouTube.Models;
 using Microsoft.AspNetCore.Mvc;
 using YoutubeExplode;
@@ -50,6 +51,108 @@ public class AudioController(
         {
             logger.LogError(ex, "An error occurred while processing the request: {VideoUrl}", videoUrl);
             return StatusCode(500, "An internal server error occurred. Please try again later.");
+        }
+    }
+    
+    [HttpGet("get-split-audio")]
+    public async Task<IActionResult> Get([FromQuery] string videoUrl, [FromQuery] TimeSpan? startTime, [FromQuery] TimeSpan? endTime)
+    {
+        if (string.IsNullOrEmpty(videoUrl))
+        {
+            logger.LogWarning("VideoUrl parameter is required.");
+            return BadRequest("VideoUrl parameter is required.");
+        }
+
+        try
+        {
+            var youtube = new YoutubeClient();
+            var video = await youtube.Videos.GetAsync(videoUrl);
+            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoUrl);
+            var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+
+            var stream = await youtube.Videos.Streams.GetAsync(streamInfo);
+
+            var memoryStream = new MemoryStream();
+            await stream.CopyToAsync(memoryStream);
+            memoryStream.Position = 0;
+
+            memoryStream = await TrimAudioStream(memoryStream, startTime, endTime);
+
+            return File(memoryStream, "audio/mp3", $"{video.Title}.mp3");
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while processing the request: {VideoUrl}", videoUrl);
+            return StatusCode(500, "An internal server error occurred. Please try again later.");
+        }
+    }
+
+    private async Task<MemoryStream> TrimAudioStream(MemoryStream originalStream, TimeSpan? startTime,
+        TimeSpan? endTime)
+    {
+        var inputFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.webm");
+        var outputFile = Path.Combine(Path.GetTempPath(), $"{Guid.NewGuid()}.mp3");
+
+        try
+        {
+            // Write the original stream to a temporary file
+            using (var fileStream = new FileStream(inputFile, FileMode.Create, FileAccess.Write))
+            {
+                originalStream.Position = 0;
+                await originalStream.CopyToAsync(fileStream);
+            }
+
+            // Prepare FFmpeg arguments
+            var arguments = $"-i \"{inputFile}\"";
+
+            if (startTime.HasValue)
+            {
+                arguments += $" -ss {startTime.Value:hh\\:mm\\:ss\\.fff}";
+            }
+
+            if (endTime.HasValue)
+            {
+                arguments += $" -to {endTime.Value:hh\\:mm\\:ss\\.fff}";
+            }
+
+            arguments += $" -c:a libmp3lame -q:a 2 \"{outputFile}\""; // Re-encode to MP3 format
+
+            // Run FFmpeg
+            using (var process = new Process())
+            {
+                process.StartInfo.FileName = "ffmpeg"; // Make sure ffmpeg is in your PATH
+                process.StartInfo.Arguments = arguments;
+                process.StartInfo.UseShellExecute = false;
+                process.StartInfo.RedirectStandardOutput = true;
+                process.StartInfo.RedirectStandardError = true;
+
+                process.Start();
+                await process.WaitForExitAsync();
+
+                if (process.ExitCode != 0)
+                {
+                    var error = await process.StandardError.ReadToEndAsync();
+                    throw new Exception($"FFmpeg process failed with exit code {process.ExitCode}. Error: {error}");
+                }
+            }
+
+            // Read the output file into a new MemoryStream
+            var resultStream = new MemoryStream();
+            using (var fileStream = new FileStream(outputFile, FileMode.Open, FileAccess.Read))
+            {
+                await fileStream.CopyToAsync(resultStream);
+            }
+
+            resultStream.Position = 0;
+            return resultStream;
+        }
+        finally
+        {
+            // Clean up temporary files
+            if (System.IO.File.Exists(inputFile))
+                System.IO.File.Delete(inputFile);
+            if (System.IO.File.Exists(outputFile))
+                System.IO.File.Delete(outputFile);
         }
     }
     

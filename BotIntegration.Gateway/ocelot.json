@@ -160,6 +160,27 @@
       }
     },
     {
+      "UpstreamPathTemplate": "/api/gateway/youtube/v1/audio/get-split-audio{everything}",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/audio/get-split-audio{everything}",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__YoutubeEndpoint1}",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      },
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 25
+      }
+    },
+    {
       "UpstreamPathTemplate": "/api/gateway/youtube/v1/health",
       "UpstreamHttpMethod": [ "Get" ],
       "DownstreamPathTemplate": "/api/health",
