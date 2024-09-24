@@ -37,6 +37,27 @@
       }
     },
     {
+      "UpstreamPathTemplate": "/api/gateway/audio/v1/language",
+      "UpstreamHttpMethod": [ "Post" ],
+      "DownstreamPathTemplate": "/api/language",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__AudioEndpoint}",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      },
+      "RateLimitOptions": {
+        "EnableRateLimiting": true,
+        "Period": "1m",
+        "PeriodTimespan": 60,
+        "Limit": 5
+      }
+    },
+    {
       "UpstreamPathTemplate": "/api/gateway/audio/v1/translate/status{everything}",
       "UpstreamHttpMethod": [ "Get" ],
       "DownstreamPathTemplate": "/api/translation/status{everything}",

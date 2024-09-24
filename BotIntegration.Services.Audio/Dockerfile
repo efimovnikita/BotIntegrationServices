@@ -1,14 +1,24 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
+
 # Switch to root user to install ffmpeg
 USER root
-# Install ffmpeg
+
+# Install necessary dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y ffmpeg git wget build-essential && \
     # Clean up to reduce image size
     apt-get clean && \
     rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Clone whisper.cpp repository, build it, and download the model
+RUN git clone https://github.com/ggerganov/whisper.cpp.git /whisper.cpp && \
+    cd /whisper.cpp && \
+    make && \
+    bash ./models/download-ggml-model.sh tiny
+    
 # Return to the application user
 USER $APP_UID
+
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
