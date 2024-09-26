@@ -1,6 +1,7 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Playwright;
+using Polly;
 
 namespace BotIntegration.Services.YouTube.Controllers;
 
@@ -62,9 +63,31 @@ public class AudioController(
         await page.FillAsync("#videoUrl", videoUrl);
         await page.ClickAsync("#videoBtn");
 
-        // Wait for the "Extract Audio" link to appear
+        // Define retry policy
+        var retryPolicy = Policy
+            .Handle<TimeoutException>()
+            .Or<PlaywrightException>()
+            .WaitAndRetryAsync(
+                3,
+                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (exception, timeSpan, retryCount, _) =>
+                {
+                    logger.LogWarning(exception,
+                        "Attempt {RetryCount} failed to find 'Extract Audio' link. Retrying in {RetryInterval}s.",
+                        retryCount, timeSpan.TotalSeconds);
+                }
+            );
+
+        // Wait for the "Extract Audio" link to appear with retry logic
         logger.LogInformation("Waiting for 'Extract Audio' link to appear.");
-        await page.WaitForSelectorAsync("a.btn.btn-success.js-download:has-text('Extract Audio')");
+        await retryPolicy.ExecuteAsync(async () =>
+        {
+            await page.WaitForSelectorAsync("a.btn.btn-success.js-download:has-text('Extract Audio')",
+                new PageWaitForSelectorOptions
+                {
+                    Timeout = 30000
+                });
+        });
 
         // Set up a task to wait for the download to complete
         var downloadTaskCompletionSource = new TaskCompletionSource<string>();
