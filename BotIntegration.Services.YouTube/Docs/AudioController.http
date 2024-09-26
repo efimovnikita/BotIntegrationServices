@@ -14,3 +14,7 @@ Authorization: Bearer {{access_token}}
 GET {{gateway}}/api/gateway/youtube/v1/audio?videoUrl=https://youtu.be/DreKvN6d6W8?si=De4dUI8K_kChNaQe
 Accept: audio/mp3
 Authorization: Bearer {{access_token}}
+
+### Test Get Audio Endpoint (local)
+GET http://localhost:5002/api/audio?videoUrl=https://youtu.be/maIQtKpeH-I?si=jTGmjGelU6zPxsxs
+Accept: audio/mp3

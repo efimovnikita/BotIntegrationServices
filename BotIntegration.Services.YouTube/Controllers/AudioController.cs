@@ -6,6 +6,7 @@ using YoutubeExplode;
 using YoutubeExplode.Videos.Streams;
 using Hangfire;
 using Hangfire.Server;
+using Microsoft.Playwright;
 using Refit;
 
 namespace BotIntegration.Services.YouTube.Controllers;
@@ -34,18 +35,96 @@ public class AudioController(
 
         try
         {
-            var youtube = new YoutubeClient();
-            var video = await youtube.Videos.GetAsync(videoUrl);
-            var streamManifest = await youtube.Videos.Streams.GetManifestAsync(videoUrl);
-            var streamInfo = streamManifest.GetAudioOnlyStreams().GetWithHighestBitrate();
+            var downloadPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+            logger.LogInformation("Creating download directory at {DownloadPath}", downloadPath);
+            Directory.CreateDirectory(downloadPath);
 
-            var stream = await youtube.Videos.Streams.GetAsync(streamInfo);
+            using var playwright = await Playwright.CreateAsync();
+            await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+            {
+                Headless = true,
+                DownloadsPath = downloadPath
+            });
+            var context = await browser.NewContextAsync(new BrowserNewContextOptions
+            {
+                AcceptDownloads = true
+            });
+            var page = await context.NewPageAsync();
 
-            var memoryStream = new MemoryStream();
-            await stream.CopyToAsync(memoryStream);
-            memoryStream.Position = 0;
+            var providerUrl = configuration["Provider"] ?? "";
+            logger.LogInformation("Navigating to provider URL: {ProviderUrl}", providerUrl);
+            await page.GotoAsync(providerUrl);
 
-            return File(memoryStream, "audio/mp3", $"{video.Title}.mp3");
+            // Fill in the video URL and click the submit button
+            logger.LogInformation("Filling in video URL and clicking submit button.");
+            await page.FillAsync("#videoUrl", videoUrl);
+            await page.ClickAsync("#videoBtn");
+
+            // Wait for the "Extract Audio" link to appear
+            logger.LogInformation("Waiting for 'Extract Audio' link to appear.");
+            await page.WaitForSelectorAsync("a.btn.btn-success.js-download:has-text('Extract Audio')");
+
+            // Set up a task to wait for the download to complete
+            var downloadTaskCompletionSource = new TaskCompletionSource<string>();
+            var downloadedFilePath = string.Empty;
+
+            page.Download += (_, download) =>
+            {
+                downloadedFilePath = Path.Combine(downloadPath, download.SuggestedFilename);
+                logger.LogInformation("Download started for file: {FileName}", download.SuggestedFilename);
+                download.SaveAsAsync(downloadedFilePath)
+                    .ContinueWith(_ => downloadTaskCompletionSource.SetResult(downloadedFilePath));
+            };
+
+            // Use JavaScript to wait for the dropdown, click it, wait for the MP3 link, and click it
+            logger.LogInformation("Executing JavaScript to handle dropdown and MP3 link.");
+            await page.EvaluateAsync("""
+                 async () => {
+                     // Wait for the dropdown button to appear
+                     await new Promise(resolve => {
+                         const checkElement = setInterval(() => {
+                             const button = document.querySelector('button.btn.btn-success.dropdown-toggle');
+                             if (button && button.textContent.includes('m4a')) {
+                                 clearInterval(checkElement);
+                                 resolve(button);
+                             }
+                         }, 100);
+                     });
+             
+                     // Click the dropdown button
+                     document.querySelector('button.btn.btn-success.dropdown-toggle').click();
+             
+                     // Wait for the MP3 download link to appear
+                     const mp3Link = await new Promise(resolve => {
+                         const checkLink = setInterval(() => {
+                             const link = document.querySelector('a.js-download[data-format="mp3"]');
+                             if (link && link.textContent.includes('mp3 (quality: 48 kHz)')) {
+                                 clearInterval(checkLink);
+                                 resolve(link);
+                             }
+                         }, 100);
+                     });
+             
+                     // Click the MP3 download link
+                     mp3Link.click();
+                 }
+                """);
+
+            // Wait for the download to complete or timeout after 60 seconds
+            logger.LogInformation("Waiting for download to complete or timeout after 4 minutes.");
+            var downloadTask =
+                await Task.WhenAny(downloadTaskCompletionSource.Task, Task.Delay(TimeSpan.FromMinutes(4)));
+
+            if (downloadTask != downloadTaskCompletionSource.Task)
+            {
+                logger.LogError("Download did not complete within the expected time.");
+                throw new TimeoutException("Download did not complete within the expected time.");
+            }
+
+            // Return the MP3 file
+            logger.LogInformation("Download completed. Returning the MP3 file.");
+            var fileStream = new FileStream(downloadedFilePath, FileMode.Open, FileAccess.Read);
+            return File(fileStream, "audio/mpeg", $"{Guid.NewGuid()}.mp3");
         }
         catch (Exception ex)
         {

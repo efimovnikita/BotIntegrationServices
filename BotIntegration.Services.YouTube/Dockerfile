@@ -1,8 +1,33 @@
 ﻿FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
 
-# Install FFmpeg
+# Install FFmpeg and other dependencies
 RUN apt-get update && \
-    apt-get install -y ffmpeg && \
+    apt-get install -y ffmpeg \
+    libnss3 \
+    libnspr4 \
+    libatk1.0-0 \
+    libatk-bridge2.0-0 \
+    libcups2 \
+    libatspi2.0-0 \
+    libxcomposite1 \
+    libxdamage1 \
+    libgtk-3-0 \
+    libgstreamer1.0-0 \
+    libatomic1 \
+    libxslt1.1 \
+    libwoff1 \
+    libevent-2.1-7 \
+    libgstreamer-plugins-base1.0-0 \
+    libgstreamer-plugins-bad1.0-0 \
+    libwebpdemux2 \
+    libharfbuzz-icu0 \
+    libenchant-2-2 \
+    libsecret-1-0 \
+    libhyphen0 \
+    libmanette-0.2-0 \
+    libpsl5 \
+    libnghttp2-14 \
+    libgles2 && \
     rm -rf /var/lib/apt/lists/*
 
 RUN addgroup --gid 1000 appgroup && \
