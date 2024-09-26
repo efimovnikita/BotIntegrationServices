@@ -30,11 +30,6 @@ RUN apt-get update && \
     libgles2 && \
     rm -rf /var/lib/apt/lists/*
 
-RUN addgroup --gid 1000 appgroup && \
-    adduser --uid 1000 --ingroup appgroup --disabled-password --gecos "" appuser
-
-USER appuser
-
 WORKDIR /app
 EXPOSE 80
 EXPOSE 443
@@ -56,6 +51,6 @@ FROM base AS final
 WORKDIR /app
 COPY --from=publish /app/publish .
 
-USER appuser
+RUN chmod +x /app/.playwright/node/*/node
 
 ENTRYPOINT ["dotnet", "BotIntegration.Services.YouTube.dll"]
