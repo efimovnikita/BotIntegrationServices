@@ -1,4 +1,4 @@
-namespace BotIntegration.Services.ArtifactsRepo.Models;
+namespace BotIntegration.Shared;
 
 public class VersionEntryRequest
 {

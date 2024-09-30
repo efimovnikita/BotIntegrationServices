@@ -27,6 +27,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.Aud
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.ArtifactsRepo", "BotIntegration.Services.ArtifactsRepo\BotIntegration.Services.ArtifactsRepo.csproj", "{5E8A0855-6E53-4DAA-8424-995AA9D9CEB9}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "BotIntegration.Services.ArtifactsRepo.FrontEnd", "BotIntegration.Services.ArtifactsRepo.FrontEnd\BotIntegration.Services.ArtifactsRepo.FrontEnd.csproj", "{ABE0468D-1890-4040-8376-B303C3742362}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -61,6 +63,10 @@ Global
 		{5E8A0855-6E53-4DAA-8424-995AA9D9CEB9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{5E8A0855-6E53-4DAA-8424-995AA9D9CEB9}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{5E8A0855-6E53-4DAA-8424-995AA9D9CEB9}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ABE0468D-1890-4040-8376-B303C3742362}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ABE0468D-1890-4040-8376-B303C3742362}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ABE0468D-1890-4040-8376-B303C3742362}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ABE0468D-1890-4040-8376-B303C3742362}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{3997720D-FF47-4020-9E28-27F8F27283AE} = {4FCD8132-B437-4C95-B606-5A6C2D52811B}
@@ -73,5 +79,6 @@ Global
 		{9C7931FE-D731-4CAA-935A-3F5A8C174BCB} = {669D936C-0EA9-4283-8438-7EE11EC48582}
 		{2220D2FD-A400-44C7-9D97-CF4B5BCA82A5} = {669D936C-0EA9-4283-8438-7EE11EC48582}
 		{5E8A0855-6E53-4DAA-8424-995AA9D9CEB9} = {669D936C-0EA9-4283-8438-7EE11EC48582}
+		{ABE0468D-1890-4040-8376-B303C3742362} = {669D936C-0EA9-4283-8438-7EE11EC48582}
 	EndGlobalSection
 EndGlobal

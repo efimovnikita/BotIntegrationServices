@@ -1,0 +1,247 @@
+﻿@page "/"
+@using Blazored.LocalStorage
+@using BotIntegration.Shared
+@using Refit
+
+@inject IConfiguration Configuration
+@inject ILogger<Home> Logger
+@inject ILocalStorageService LocalStorage
+
+<PageTitle>Upload a new set of artifacts</PageTitle>
+
+<div class="max-w-md mx-auto p-6 bg-gray-50 rounded-lg shadow-md mt-1 lg:mt-6">
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="app-name">
+            App Name:
+        </label>
+        <input type="text"
+               id="app-name"
+               @bind="AppName"
+               class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"/>
+    </div>
+
+    <div class="mb-4 flex space-x-2">
+        <div class="flex-1">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="major-version">
+                Major Version:
+            </label>
+            <input type="number"
+                   id="major-version"
+                   @bind="MajorVersion"
+                   class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"/>
+        </div>
+        <div class="flex-1">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="minor-version">
+                Minor Version:
+            </label>
+            <input type="number"
+                   id="minor-version"
+                   @bind="MinorVersion"
+                   class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"/>
+        </div>
+        <div class="flex-1">
+            <label class="block text-gray-700 text-sm font-bold mb-2" for="patch-version">
+                Patch Version:
+            </label>
+            <input type="number"
+                   id="patch-version"
+                   @bind="PatchVersion"
+                   class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"/>
+        </div>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="file-input">
+            Select File
+        </label>
+        <InputFile OnChange="@HandleFileSelected" class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none" id="file-input"/>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="notes">
+            Notes:
+        </label>
+        <textarea id="notes"
+                  @bind="Notes"
+                  rows="3"
+                  class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"></textarea>
+    </div>
+
+    <div class="mb-4">
+        <label class="block text-gray-700 text-sm font-bold mb-2" for="client-secret">
+            Client secret:
+        </label>
+        <input type="password"
+               id="client-secret"
+               name="client-secret"
+               @bind="ClientSecret"
+               class="w-full px-3 py-2 text-gray-700 bg-white border rounded-lg focus:outline-none focus:border-blue-500"/>
+    </div>
+
+    <div class="mb-4">
+        <button type="button"
+                class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled="@(!IsFormValid())"
+                @onclick="UploadFile">
+            Upload
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(UploadMessage))
+    {
+        <div class="mb-4 p-3 @(UploadMessage.StartsWith("Error") ? "bg-red-100 text-red-700" : "bg-green-100 text-green-700") rounded-lg">
+            @UploadMessage
+        </div>
+    }
+
+    @if (IsUploading)
+    {
+        <div class="mb-4">
+            <div class="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700 overflow-hidden">
+                <div class="bg-blue-600 h-full rounded-full animate-indeterminate-progress"></div>
+            </div>
+        </div>
+    }
+
+    <div class="mb-4">
+        <button type="button"
+                class="w-full bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline"
+                @onclick="FetchVersionEntries">
+            Fetch Version Entries
+        </button>
+    </div>
+
+    @if (!string.IsNullOrEmpty(VersionEntries))
+    {
+        <div class="mb-4 mt-6">
+            <h3 class="text-lg font-semibold mb-2">Version Entries:</h3>
+            <pre class="bg-gray-100 p-4 rounded-lg overflow-x-auto">@VersionEntries</pre>
+        </div>
+    }
+
+</div>
+
+@code {
+    private const string Key = "secret";
+    private bool _fileSelected;
+    private IBrowserFile? _selectedFile;
+    private string ClientSecret { get; set; } = string.Empty;
+    private bool IsUploading { get; set; }
+    private string AppName { get; set; } = string.Empty;
+    private int MajorVersion { get; set; }
+    private int MinorVersion { get; set; }
+    private int PatchVersion { get; set; }
+    private string Notes { get; set; } = string.Empty;
+    private string UploadMessage { get; set; } = string.Empty;
+
+    private bool IsFormValid()
+    {
+        return _fileSelected &&
+               !string.IsNullOrWhiteSpace(AppName) &&
+               !string.IsNullOrWhiteSpace(ClientSecret) &&
+               MajorVersion >= 0 &&
+               MinorVersion >= 0 &&
+               PatchVersion >= 0;
+    }
+    
+    private string VersionEntries { get; set; } = string.Empty;
+
+    [Inject]
+    private IVersionEntryApi VersionEntryApi { get; set; } = default!;
+    
+    [Inject]
+    private IAuthApi AuthApi { get; set; } = default!;
+
+    private async Task FetchVersionEntries()
+    {
+        try
+        {
+            await LocalStorage.SetItemAsStringAsync(Key, ClientSecret);
+
+            var data = new Dictionary<string, string>
+            {
+                { IAuthApi.GrantType, IAuthApi.ClientCredentials },
+                { IAuthApi.ClientId, Configuration["ClientConfiguration:ClientId"] ?? "" },
+                { IAuthApi.ClientSecret, ClientSecret }
+            };
+
+            var authData = await AuthApi.GetAuthData(data);
+
+            VersionEntries = await VersionEntryApi.GetAllVersionEntries($"Bearer {authData.AccessToken}");
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error fetching version entries");
+            VersionEntries = "Error fetching version entries. Please try again.";
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        var secret = await LocalStorage.GetItemAsStringAsync(Key);
+        if (string.IsNullOrWhiteSpace(secret))
+        {
+            return;
+        }
+
+        ClientSecret = secret;
+        StateHasChanged();
+    }
+
+    private void HandleFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedFile = e.File;
+        _fileSelected = _selectedFile != null;
+    }
+
+    private async Task UploadFile()
+    {
+        try
+        {
+            IsUploading = true;
+            UploadMessage = string.Empty;
+            StateHasChanged();
+        
+            if (_selectedFile != null)
+            {
+                await LocalStorage.SetItemAsStringAsync(Key, ClientSecret);
+
+                var data = new Dictionary<string, string>
+                {
+                    { IAuthApi.GrantType, IAuthApi.ClientCredentials },
+                    { IAuthApi.ClientId, Configuration["ClientConfiguration:ClientId"] ?? "" },
+                    { IAuthApi.ClientSecret, ClientSecret }
+                };
+
+                var authData = await AuthApi.GetAuthData(data);
+
+                var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100_000_000);
+                var streamPart = new StreamPart(stream, _selectedFile.Name, "application/zip");
+
+                await VersionEntryApi.CreateVersionEntry(
+                    authorization: $"Bearer {authData.AccessToken}",
+                    AppName,
+                    MajorVersion,
+                    MinorVersion,
+                    PatchVersion,
+                    DateTime.Now.ToString("o"), // Use ISO 8601 format
+                    Notes,
+                    artifactsZip: streamPart);
+
+                UploadMessage = "Version entry uploaded successfully!";
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Error uploading version entry");
+            UploadMessage = $"Error uploading version entry: {ex.Message}. Please try again.";
+        }
+        finally
+        {
+            IsUploading = false;
+            StateHasChanged();
+        }
+    }
+}

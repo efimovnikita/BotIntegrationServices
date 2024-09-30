@@ -8,6 +8,7 @@ FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 COPY ["BotIntegration.Services.ArtifactsRepo/BotIntegration.Services.ArtifactsRepo.csproj", "BotIntegration.Services.ArtifactsRepo/"]
+COPY ["BotIntegration.Shared/BotIntegration.Shared.csproj", "BotIntegration.Shared/"]
 RUN dotnet restore "BotIntegration.Services.ArtifactsRepo/BotIntegration.Services.ArtifactsRepo.csproj"
 COPY . .
 WORKDIR "/src/BotIntegration.Services.ArtifactsRepo"

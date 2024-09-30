@@ -1,5 +1,6 @@
 ﻿using BotIntegration.Services.ArtifactsRepo.Models;
 using BotIntegration.Services.ArtifactsRepo.Services;
+using BotIntegration.Shared;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BotIntegration.Services.ArtifactsRepo.Controllers;
