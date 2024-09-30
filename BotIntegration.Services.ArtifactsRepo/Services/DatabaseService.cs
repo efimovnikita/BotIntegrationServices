@@ -28,7 +28,8 @@ public class DatabaseService
     {
         var options = new GridFSUploadOptions
         {
-            Metadata = new MongoDB.Bson.BsonDocument("contentType", "application/zip")
+            Metadata = new MongoDB.Bson.BsonDocument("contentType", "application/zip"),
+            ChunkSizeBytes = 1048576 // 1 MB chunks
         };
 
         var fileId = await _gridFsBucket.UploadFromStreamAsync(fileName, zipStream, options);

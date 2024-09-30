@@ -10,6 +10,8 @@ public class VersionEntryController(DatabaseService databaseService, ILogger<Ver
     : ControllerBase
 {
     [HttpPost]
+    [DisableRequestSizeLimit]
+    [RequestFormLimits(MultipartBodyLengthLimit = long.MaxValue, ValueLengthLimit = int.MaxValue)]
     public async Task<IActionResult> CreateVersionEntry([FromForm] VersionEntryRequest request, IFormFile artifactsZip)
     {
         if (!ModelState.IsValid)
@@ -33,10 +35,24 @@ public class VersionEntryController(DatabaseService databaseService, ILogger<Ver
             }
 
             // Store the zip archive
-            using var stream = artifactsZip.OpenReadStream();
-            var archiveId = await databaseService.StoreZipArchiveAsync(artifactsZip.FileName, stream);
+            string tempFilePath = Path.GetTempFileName();
+            logger.LogInformation("Temporary file created at: {TempFilePath}", tempFilePath);
 
-            logger.LogInformation("Stored zip archive with ID: {ArchiveId}", archiveId);
+            using (var fileStream = new FileStream(tempFilePath, FileMode.Create))
+            {
+                await artifactsZip.CopyToAsync(fileStream);
+                logger.LogInformation("Copied artifacts zip to temporary file.");
+            }
+
+            string archiveId;
+            using (var fileStream = new FileStream(tempFilePath, FileMode.Open))
+            {
+                archiveId = await databaseService.StoreZipArchiveAsync(artifactsZip.FileName, fileStream);
+                logger.LogInformation("Stored zip archive with ID: {ArchiveId}", archiveId);
+            }
+
+            System.IO.File.Delete(tempFilePath);
+            logger.LogInformation("Deleted temporary file at: {TempFilePath}", tempFilePath);
 
             // Create the version entry
             var versionEntry = new AppArtifactsVersionEntry
@@ -135,12 +151,12 @@ public class VersionEntryController(DatabaseService databaseService, ILogger<Ver
 
             var currentVersion = new
             {
-                AppName = latestVersion.AppName,
-                MajorVersion = latestVersion.MajorVersion,
-                MinorVersion = latestVersion.MinorVersion,
-                PatchVersion = latestVersion.PatchVersion,
-                Date = latestVersion.Date,
-                Notes = latestVersion.Notes
+                latestVersion.AppName,
+                latestVersion.MajorVersion,
+                latestVersion.MinorVersion,
+                latestVersion.PatchVersion,
+                latestVersion.Date,
+                latestVersion.Notes
             };
 
             logger.LogInformation("Returning current version for app: {AppName}", appName);
