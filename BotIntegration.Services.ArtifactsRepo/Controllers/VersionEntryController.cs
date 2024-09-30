@@ -168,4 +168,22 @@ public class VersionEntryController(DatabaseService databaseService, ILogger<Ver
             return StatusCode(500, "An error occurred while retrieving the current version.");
         }
     }
+    
+    [HttpGet("all")]
+    public async Task<IActionResult> GetAllVersionEntries()
+    {
+        try
+        {
+            var allVersions = await databaseService.GetAllVersionEntriesAsync();
+            var formattedVersions = allVersions.Select(v => $"{v.AppName} (v.{v.MajorVersion}.{v.MinorVersion}.{v.PatchVersion})");
+
+            logger.LogInformation("Returning all version entries");
+            return Ok(string.Join("\n", formattedVersions));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "An error occurred while retrieving all version entries");
+            return StatusCode(500, "An error occurred while retrieving all version entries.");
+        }
+    }
 }

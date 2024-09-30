@@ -305,6 +305,21 @@
       "AuthenticationOptions": {
         "AuthenticationProviderKey": "Bearer"
       }
+    },
+    {
+      "UpstreamPathTemplate": "/api/gateway/artifacts-repo/v1/version-entry/all",
+      "UpstreamHttpMethod": [ "Get" ],
+      "DownstreamPathTemplate": "/api/VersionEntry/all",
+      "DownstreamScheme": "http",
+      "DownstreamHostAndPorts": [
+        {
+          "Host": "${Urls__ArtifactsRepoEndpoint}",
+          "Port": 8080
+        }
+      ],
+      "AuthenticationOptions": {
+        "AuthenticationProviderKey": "Bearer"
+      }
     }
   ]
 }

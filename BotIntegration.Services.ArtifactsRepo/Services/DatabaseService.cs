@@ -87,4 +87,15 @@ public class DatabaseService
             .Sort(sort)
             .FirstOrDefaultAsync();
     }
+    
+    public async Task<List<AppArtifactsVersionEntry>> GetAllVersionEntriesAsync()
+    {
+        return await _versionEntries.Find(_ => true)
+            .Sort(Builders<AppArtifactsVersionEntry>.Sort
+                .Ascending(e => e.AppName)
+                .Descending(e => e.MajorVersion)
+                .Descending(e => e.MinorVersion)
+                .Descending(e => e.PatchVersion))
+            .ToListAsync();
+    }
 }

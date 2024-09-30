@@ -39,6 +39,11 @@ GET http://localhost:5000/api/VersionEntry/TestApp/latest/archive
 ### Get Current Version Info (local)
 GET http://localhost:5000/api/VersionEntry/TestApp/current-version
 
+### Get All Version Entries (local)
+GET http://localhost:5000/api/VersionEntry/all
+
+
+
 
 
 
@@ -91,4 +96,8 @@ Authorization: Bearer {{access_token}}
 
 ### Get Current Version Info (remote)
 GET {{gateway}}/api/gateway/artifacts-repo/v1/version-entry/TestApp/current-version
+Authorization: Bearer {{access_token}}
+
+### Get All Version Entries (remote)
+GET {{gateway}}/api/gateway/artifacts-repo/v1/version-entry/all
 Authorization: Bearer {{access_token}}
