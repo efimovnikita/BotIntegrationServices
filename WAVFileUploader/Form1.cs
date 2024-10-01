@@ -18,8 +18,6 @@ public partial class Form1 : Form
     private const string ClientId = "Configuration:ClientId";
     private const string ClientSecret = "Configuration:ClientSecret";
     private const string? MultipartFormData = "multipart/form-data";
-    private System.Windows.Forms.Timer? _updateCheckTimer;
-    private const int UpdateCheckIntervalMinutes = 5;
     
     public Form1(IConfiguration configuration, IFileSharingApi fileSharingApi,
         IAuthApi authApi, IVersionEntryApi versionEntryApi)
@@ -31,22 +29,9 @@ public partial class Form1 : Form
         InitializeComponent();
         InitializeSystemTrayIcon();
         InitializeFileWatcher();
-        InitializeUpdateCheckTimer();
-
-#if RELEASE
-        CheckNewVersion();
-#endif
-    }
-    
-    private void InitializeUpdateCheckTimer()
-    {
-        _updateCheckTimer = new System.Windows.Forms.Timer();
-        _updateCheckTimer.Interval = UpdateCheckIntervalMinutes * 60 * 1000; // Convert minutes to milliseconds
-        _updateCheckTimer.Tick += (sender, args) => CheckNewVersion();
-        _updateCheckTimer.Start();
     }
 
-    private async void CheckNewVersion()
+    private async void OnCheckNewVersion(object? sender, EventArgs e)
     {
         try
         {
@@ -66,39 +51,42 @@ public partial class Form1 : Form
             // Create a Version object for the remote version
             var remoteVersion = new Version(versionResponse.MajorVersion, versionResponse.MinorVersion, versionResponse.PatchVersion);
 
-            if (IsNewVersionAvailable(currentVersion, remoteVersion))
+            if (!IsNewVersionAvailable(currentVersion, remoteVersion))
             {
-                var message = $"A new version ({remoteVersion}) is available. Would you like to update now?";
-                if (!string.IsNullOrEmpty(versionResponse.Notes))
-                {
-                    message += $"\n\nRelease Notes:\n{versionResponse.Notes}";
-                }
-                var result = MessageBox.Show(message, $"{Resources.AppName} - Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-                
-                if (result == DialogResult.Yes)
-                {
-                    var updaterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WAVFileUploaderUpdater.exe");
-                    var gatewayBaseAddress = _configuration["Urls:GatewayBaseAddress"] ?? "";
-                    var authGatewayBaseAddress = _configuration["Urls:AuthGatewayBaseAddress"] ?? "";
-                    var mainAppPath = Application.ExecutablePath;
+                MessageBox.Show($"You are using the latest version ({currentVersion}).", $"{Resources.AppName} - No Update Available", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                return;
+            }
 
-                    var startInfo = new ProcessStartInfo
-                    {
-                        FileName = updaterPath,
-                        Arguments = $"\"{_configuration[ClientId]}\" \"{_configuration[ClientSecret]}\" \"{mainAppPath}\" \"{gatewayBaseAddress}\" \"{authGatewayBaseAddress}\"",
-                        UseShellExecute = true,
-                    };
+            var result = MessageBox.Show(
+                $"A new version ({remoteVersion}) is available. Do you want to update now?", 
+                $"{Resources.AppName} - Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
 
-                    try
-                    {
-                        Process.Start(startInfo);
-                        Application.Exit();
-                    }
-                    catch (Exception ex)
-                    {
-                        MessageBox.Show($"Error starting the updater: {ex.Message}", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-                    }
-                }
+            if (result != DialogResult.Yes)
+            {
+                return;
+            }
+
+            var updaterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WAVFileUploaderUpdater.exe");
+            var gatewayBaseAddress = _configuration["Urls:GatewayBaseAddress"] ?? "";
+            var authGatewayBaseAddress = _configuration["Urls:AuthGatewayBaseAddress"] ?? "";
+            var mainAppPath = Application.ExecutablePath;
+
+            var startInfo = new ProcessStartInfo
+            {
+                FileName = updaterPath,
+                Arguments =
+                    $"\"{_configuration[ClientId]}\" \"{_configuration[ClientSecret]}\" \"{mainAppPath}\" \"{gatewayBaseAddress}\" \"{authGatewayBaseAddress}\"",
+                UseShellExecute = true,
+            };
+
+            try
+            {
+                Process.Start(startInfo);
+                Application.Exit();
+            }
+            catch (Exception ex)
+            {
+                ShowNotification("Update Error", $"Error starting the updater: {ex.Message}", ToolTipIcon.Error);
             }
         }
         catch
@@ -115,8 +103,7 @@ public partial class Form1 : Form
     private void InitializeSystemTrayIcon()
     {
         _trayMenu = new ContextMenuStrip();
-        var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown version";
-        _trayMenu.Items.Add($"Version: {currentVersion}");
+        _trayMenu.Items.Add("Check for updates", null, OnCheckNewVersion);
         _trayMenu.Items.Add("Close", Resources.CloseIcon, OnClose);
         
         _trayIcon = new NotifyIcon
@@ -205,6 +192,5 @@ public partial class Form1 : Form
     {
         base.OnFormClosing(e);
         _trayIcon?.Dispose();
-        _updateCheckTimer?.Dispose();
     }
 }
