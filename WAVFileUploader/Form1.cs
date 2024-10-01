@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using BotIntegration.Shared;
 using Microsoft.Extensions.Configuration;
 using Refit;
@@ -29,7 +30,9 @@ public partial class Form1 : Form
         InitializeSystemTrayIcon();
         InitializeFileWatcher();
 
+#if RELEASE
         CheckNewVersion();
+#endif
     }
 
     private async void CheckNewVersion()
@@ -60,17 +63,32 @@ public partial class Form1 : Form
                     message += $"\n\nRelease Notes:\n{versionResponse.Notes}";
                 }
                 var result = MessageBox.Show(message, $"{Resources.AppName} - Update Available", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
-#if RELEASE
+                
                 if (result == DialogResult.Yes)
                 {
-                    // Code to initiate the update process
+                    var updaterPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "WAVFileUploaderUpdater.exe");
+                    var gatewayBaseAddress = _configuration["Urls:GatewayBaseAddress"] ?? "";
+                    var authGatewayBaseAddress = _configuration["Urls:AuthGatewayBaseAddress"] ?? "";
+                    var mainAppPath = Application.ExecutablePath;
+
+                    var startInfo = new ProcessStartInfo
+                    {
+                        FileName = updaterPath,
+                        Arguments = $"\"{_configuration[ClientId]}\" \"{_configuration[ClientSecret]}\" \"{mainAppPath}\" \"{gatewayBaseAddress}\" \"{authGatewayBaseAddress}\"",
+                        UseShellExecute = true,
+                        // CreateNoWindow = true
+                    };
+
+                    try
+                    {
+                        Process.Start(startInfo);
+                        Application.Exit();
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Error starting the updater: {ex.Message}", "Update Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    }
                 }
-#endif
-            }
-            else
-            {
-                MessageBox.Show("You are using the latest version.", $"{Resources.AppName} - No Update Available",
-                    MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
         }
         catch
@@ -87,9 +105,10 @@ public partial class Form1 : Form
     private void InitializeSystemTrayIcon()
     {
         _trayMenu = new ContextMenuStrip();
-        // _trayMenu.Items.Add("Test", null, OnTest);
+        var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "Unknown version";
+        _trayMenu.Items.Add($"Version: {currentVersion}");
         _trayMenu.Items.Add("Close", Resources.CloseIcon, OnClose);
-
+        
         _trayIcon = new NotifyIcon
         {
             Text = Resources.AppName,
@@ -97,50 +116,6 @@ public partial class Form1 : Form
             ContextMenuStrip = _trayMenu,
             Visible = true
         };
-    }
-    
-    /*private async void OnTest(object? sender, EventArgs e)
-    {
-        try
-        {
-            var data = new Dictionary<string, string>
-            {
-                { IAuthApi.GrantType, IAuthApi.ClientCredentials },
-                { IAuthApi.ClientId, _configuration[ClientId] ?? "" },
-                { IAuthApi.ClientSecret, _configuration[ClientSecret] ?? "" }
-            };
-
-            var authData = await _authApi.GetAuthData(data);
-
-            var appName = System.Reflection.Assembly.GetExecutingAssembly().GetName().Name ?? "";
-            var result = await _versionEntryApi.GetCurrentVersion($"Bearer {authData.AccessToken}", appName);
-        
-            // Get the current assembly version
-            var currentVersion = System.Reflection.Assembly.GetExecutingAssembly().GetName().Version;
-            string currentVersionString = FormatVersion(currentVersion);
-
-            // Format the remote version
-            string remoteVersionString = $"{result.MajorVersion}.{result.MinorVersion}.{result.PatchVersion}";
-        
-            // Display both versions and additional information
-            MessageBox.Show(
-                $"Current assembly version: {currentVersionString}\n" +
-                $"Current assembly name: {appName}\n" +
-                $"Remote version: {remoteVersionString}\n" +
-                $"App Name: {result.AppName}\n" +
-                $"Date: {result.Date}\n" +
-                $"Notes: {result.Notes}",
-                "Version Info", MessageBoxButtons.OK, MessageBoxIcon.Information);
-        }
-        catch (Exception exception)
-        {
-            MessageBox.Show(exception.Message, "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        }
-    }*/
-
-    private string FormatVersion(Version? version)
-    {
-        return version == null ? "Unknown" : $"{version.Major}.{version.Minor}.{version.Build}";
     }
 
     private static Icon IconFromImage(Bitmap image)
