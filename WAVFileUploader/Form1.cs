@@ -18,7 +18,9 @@ public partial class Form1 : Form
     private const string ClientId = "Configuration:ClientId";
     private const string ClientSecret = "Configuration:ClientSecret";
     private const string? MultipartFormData = "multipart/form-data";
-
+    private System.Windows.Forms.Timer? _updateCheckTimer;
+    private const int UpdateCheckIntervalMinutes = 5;
+    
     public Form1(IConfiguration configuration, IFileSharingApi fileSharingApi,
         IAuthApi authApi, IVersionEntryApi versionEntryApi)
     {
@@ -29,10 +31,19 @@ public partial class Form1 : Form
         InitializeComponent();
         InitializeSystemTrayIcon();
         InitializeFileWatcher();
+        InitializeUpdateCheckTimer();
 
 #if RELEASE
         CheckNewVersion();
 #endif
+    }
+    
+    private void InitializeUpdateCheckTimer()
+    {
+        _updateCheckTimer = new System.Windows.Forms.Timer();
+        _updateCheckTimer.Interval = UpdateCheckIntervalMinutes * 60 * 1000; // Convert minutes to milliseconds
+        _updateCheckTimer.Tick += (sender, args) => CheckNewVersion();
+        _updateCheckTimer.Start();
     }
 
     private async void CheckNewVersion()
@@ -76,7 +87,6 @@ public partial class Form1 : Form
                         FileName = updaterPath,
                         Arguments = $"\"{_configuration[ClientId]}\" \"{_configuration[ClientSecret]}\" \"{mainAppPath}\" \"{gatewayBaseAddress}\" \"{authGatewayBaseAddress}\"",
                         UseShellExecute = true,
-                        // CreateNoWindow = true
                     };
 
                     try
@@ -195,5 +205,6 @@ public partial class Form1 : Form
     {
         base.OnFormClosing(e);
         _trayIcon?.Dispose();
+        _updateCheckTimer?.Dispose();
     }
 }
