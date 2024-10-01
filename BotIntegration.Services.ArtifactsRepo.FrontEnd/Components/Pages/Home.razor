@@ -142,7 +142,8 @@
                !string.IsNullOrWhiteSpace(ClientSecret) &&
                MajorVersion >= 0 &&
                MinorVersion >= 0 &&
-               PatchVersion >= 0;
+               PatchVersion >= 0 &&
+               !string.IsNullOrWhiteSpace(Notes);
     }
     
     private string VersionEntries { get; set; } = string.Empty;
@@ -167,8 +168,13 @@
             };
 
             var authData = await AuthApi.GetAuthData(data);
+            
+            var allVersionEntries = await VersionEntryApi.GetAllVersionEntries($"Bearer {authData.AccessToken}");
 
-            VersionEntries = await VersionEntryApi.GetAllVersionEntries($"Bearer {authData.AccessToken}");
+            // Process the version entries to show only the most recent for each app
+            var latestVersions = ProcessVersionEntries(allVersionEntries);
+            VersionEntries = string.Join("\n", latestVersions);
+        
             StateHasChanged();
         }
         catch (Exception ex)
@@ -176,6 +182,45 @@
             Logger.LogError(ex, "Error fetching version entries");
             VersionEntries = "Error fetching version entries. Please try again.";
         }
+    }
+    
+    private List<string> ProcessVersionEntries(string allVersionEntries)
+    {
+        var entries = allVersionEntries.Split('\n', StringSplitOptions.RemoveEmptyEntries);
+        var latestVersions = new Dictionary<string, string>();
+
+        foreach (var entry in entries)
+        {
+            var parts = entry.Split([" (v."], StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2)
+            {
+                var appName = parts[0].Trim();
+                var version = parts[1].TrimEnd(')');
+
+                if (!latestVersions.ContainsKey(appName) || CompareVersions(version, latestVersions[appName]) > 0)
+                {
+                    latestVersions[appName] = version;
+                }
+            }
+        }
+
+        return latestVersions.Select(kv => $"{kv.Key} (v.{kv.Value})").ToList();
+    }
+
+    private int CompareVersions(string v1, string v2)
+    {
+        var parts1 = v1.Split('.').Select(int.Parse).ToArray();
+        var parts2 = v2.Split('.').Select(int.Parse).ToArray();
+
+        for (int i = 0; i < Math.Min(parts1.Length, parts2.Length); i++)
+        {
+            if (parts1[i] != parts2[i])
+            {
+                return parts1[i].CompareTo(parts2[i]);
+            }
+        }
+
+        return parts1.Length.CompareTo(parts2.Length);
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
