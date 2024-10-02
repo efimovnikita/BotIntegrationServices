@@ -1,7 +1,5 @@
 ﻿using System.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Playwright;
-using Polly;
 
 namespace BotIntegration.Services.YouTube.Controllers;
 
@@ -22,8 +20,8 @@ public class AudioController(
 
         try
         {
-            var downloadedFilePath = await DownloadAudioUsingPlaywright(videoUrl);
-
+            var downloadedFilePath = await DownloadAudioUsingYtDlp(videoUrl);
+            
             // Return the MP3 file
             logger.LogInformation("Download completed. Returning the MP3 file.");
             var fileStream = new FileStream(downloadedFilePath, FileMode.Open, FileAccess.Read);
@@ -35,120 +33,55 @@ public class AudioController(
             return StatusCode(500, "An internal server error occurred. Please try again later.");
         }
     }
-
-    private async Task<string> DownloadAudioUsingPlaywright(string videoUrl)
+    
+    private async Task<string> DownloadAudioUsingYtDlp(string videoUrl)
     {
-        var downloadPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-        logger.LogInformation("Creating download directory at {DownloadPath}", downloadPath);
-        Directory.CreateDirectory(downloadPath);
+        var outputDir = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+        Directory.CreateDirectory(outputDir);
+        var outputTemplate = Path.Combine(outputDir, "%(title)s.%(ext)s");
+        var ytDlpPath = Path.Combine("Tools", "yt-dlp_linux");
+        var proxy = configuration["Urls:Proxy"];
 
-        using var playwright = await Playwright.CreateAsync();
-        await using var browser = await playwright.Chromium.LaunchAsync(new BrowserTypeLaunchOptions
+        var arguments = $"--proxy {proxy} " +
+                        "--user-agent \"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36\" " +
+                        "-f \"worstaudio[ext=m4a]/worstaudio/worst\" -x --audio-format mp3 " +
+                        $"-o \"{outputTemplate}\" " +
+                        $"\"{videoUrl}\"";
+
+        logger.LogInformation("Running yt-dlp with arguments: {Arguments}", arguments);
+
+        using var process = new Process();
+        process.StartInfo = new ProcessStartInfo
         {
-            Headless = true,
-            DownloadsPath = downloadPath
-        });
-        var context = await browser.NewContextAsync(new BrowserNewContextOptions
-        {
-            AcceptDownloads = true
-        });
-        var page = await context.NewPageAsync();
-
-        var providerUrl = configuration["Provider"] ?? "";
-        logger.LogInformation("Navigating to provider URL: {ProviderUrl}", providerUrl);
-        await page.GotoAsync(providerUrl);
-
-        // Fill in the video URL and click the submit button
-        logger.LogInformation("Filling in video URL and clicking submit button.");
-        await page.FillAsync("#videoUrl", videoUrl);
-        await page.ClickAsync("#videoBtn");
-
-        // Define retry policy
-        var retryPolicy = Policy
-            .Handle<TimeoutException>()
-            .Or<PlaywrightException>()
-            .WaitAndRetryAsync(
-                3,
-                retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
-                onRetry: (exception, timeSpan, retryCount, _) =>
-                {
-                    logger.LogWarning(exception,
-                        "Attempt {RetryCount} failed to find 'Extract Audio' link. Retrying in {RetryInterval}s.",
-                        retryCount, timeSpan.TotalSeconds);
-                }
-            );
-
-        // Wait for the "Extract Audio" link to appear with retry logic
-        logger.LogInformation("Waiting for 'Extract Audio' link to appear.");
-        await retryPolicy.ExecuteAsync(async () =>
-        {
-            await page.WaitForSelectorAsync("a.btn.btn-success.js-download:has-text('Extract Audio')",
-                new PageWaitForSelectorOptions
-                {
-                    Timeout = 30000
-                });
-        });
-
-        // Set up a task to wait for the download to complete
-        var downloadTaskCompletionSource = new TaskCompletionSource<string>();
-        var downloadedFilePath = string.Empty;
-
-        page.Download += (_, download) =>
-        {
-            downloadedFilePath = Path.Combine(downloadPath, download.SuggestedFilename);
-            logger.LogInformation("Download started for file: {FileName}", download.SuggestedFilename);
-            download.SaveAsAsync(downloadedFilePath)
-                .ContinueWith(_ => downloadTaskCompletionSource.SetResult(downloadedFilePath));
+            FileName = ytDlpPath,
+            Arguments = arguments,
+            UseShellExecute = false,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+            CreateNoWindow = true
         };
 
-        // Use JavaScript to wait for the dropdown, click it, wait for the MP3 link, and click it
-        logger.LogInformation("Executing JavaScript to handle dropdown and MP3 link.");
-        await page.EvaluateAsync("""
-                                  async () => {
-                                      // Wait for the dropdown button to appear
-                                      await new Promise(resolve => {
-                                          const checkElement = setInterval(() => {
-                                              const button = document.querySelector('button.btn.btn-success.dropdown-toggle');
-                                              if (button && button.textContent.includes('m4a')) {
-                                                  clearInterval(checkElement);
-                                                  resolve(button);
-                                              }
-                                          }, 100);
-                                      });
-                                 
-                                      // Click the dropdown button
-                                      document.querySelector('button.btn.btn-success.dropdown-toggle').click();
-                                 
-                                      // Wait for the MP3 download link to appear
-                                      const mp3Link = await new Promise(resolve => {
-                                          const checkLink = setInterval(() => {
-                                              const link = document.querySelector('a.js-download[data-format="mp3"]');
-                                              if (link && link.textContent.includes('mp3 (quality: 48 kHz)')) {
-                                                  clearInterval(checkLink);
-                                                  resolve(link);
-                                              }
-                                          }, 100);
-                                      });
-                                 
-                                      // Click the MP3 download link
-                                      mp3Link.click();
-                                  }
-                                 """);
+        process.Start();
+        await process.WaitForExitAsync();
 
-        // Wait for the download to complete or timeout after 4 minutes
-        logger.LogInformation("Waiting for download to complete or timeout after 4 minutes.");
-        var downloadTask =
-            await Task.WhenAny(downloadTaskCompletionSource.Task, Task.Delay(TimeSpan.FromMinutes(4)));
-
-        if (downloadTask != downloadTaskCompletionSource.Task)
+        if (process.ExitCode != 0)
         {
-            logger.LogError("Download did not complete within the expected time.");
-            throw new TimeoutException("Download did not complete within the expected time.");
+            var error = await process.StandardError.ReadToEndAsync();
+            logger.LogError("yt-dlp process failed with exit code {ExitCode}. Error: {Error}", process.ExitCode, error);
+            throw new Exception($"yt-dlp process failed with exit code {process.ExitCode}. Error: {error}");
         }
 
-        return downloadedFilePath;
-    }
+        var downloadedFiles = Directory.GetFiles(outputDir, "*.mp3");
+        if (downloadedFiles.Length == 0)
+        {
+            throw new Exception("No MP3 files were downloaded.");
+        }
 
+        var outputFilePath = downloadedFiles[0]; // Get the first downloaded file
+        logger.LogInformation("Audio download completed. File path: {FilePath}", outputFilePath);
+        return outputFilePath;
+    }
+    
     [HttpGet("get-split-audio")]
     public async Task<IActionResult> Get([FromQuery] string videoUrl, [FromQuery] TimeSpan? startTime,
         [FromQuery] TimeSpan? endTime)
@@ -162,7 +95,7 @@ public class AudioController(
         try
         {
             logger.LogInformation("Starting audio download using Playwright for video URL: {VideoUrl}", videoUrl);
-            var downloadedFilePath = await DownloadAudioUsingPlaywright(videoUrl);
+            var downloadedFilePath = await DownloadAudioUsingYtDlp(videoUrl);
             logger.LogInformation("Audio download completed. File path: {FilePath}", downloadedFilePath);
 
             var memoryStream = new MemoryStream();

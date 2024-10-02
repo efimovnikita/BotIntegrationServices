@@ -16,9 +16,13 @@ Accept: audio/mp3
 Authorization: Bearer {{access_token}}
 
 ### Test Get Audio Endpoint (local)
-GET http://localhost:5002/api/audio?videoUrl=https://youtu.be/sVQ6YijLQBE?si=YDuyp7pHe3FLw-jO
+# @timeout 5 m
+# @connection-timeout 5 m
+GET http://localhost:5002/api/audio?videoUrl=https://www.youtube.com/live/xWNNzHpcAnM?si=rog3trw_Yr23-mqB
 Accept: audio/mp3
 
 ### Test Get Audio Endpoint (local) (split audio)
+# @timeout 5 m
+# @connection-timeout 5 m
 GET http://localhost:5002/api/audio/get-split-audio?videoUrl=https://youtu.be/sVQ6YijLQBE?si=YDuyp7pHe3FLw-jO&startTime=00:00:00&endTime=00:00:05
 Accept: audio/mp3

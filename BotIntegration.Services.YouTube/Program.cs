@@ -26,12 +26,6 @@ try
     app.MapControllers();
 
     app.MapHealthChecks("/api/health");
-    
-    var exitCode = Microsoft.Playwright.Program.Main(["install"]);
-    if (exitCode != 0)
-    {
-        throw new Exception($"Playwright exited with code {exitCode}");
-    }
 
     app.Run();
 }
