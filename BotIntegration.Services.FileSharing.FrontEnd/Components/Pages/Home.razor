@@ -99,6 +99,7 @@
 
 @code {
     private const string Key = "secret";
+    private const string NightModeKey = "nightMode";
     private bool _fileSelected;
     private IBrowserFile? _selectedFile;
     private string LinkValue { get; set; } = string.Empty;
@@ -115,7 +116,7 @@
         {
             try
             {
-                var nightMode = await LocalStorage.GetItemAsync<bool>("nightMode");
+                var nightMode = await LocalStorage.GetItemAsync<bool>(NightModeKey);
                 IsNightMode = nightMode;
                 await UpdateNightModeAsync();
                 _isNightModeInitialized = true;
@@ -322,7 +323,7 @@
         IsNightMode = !IsNightMode;
         if (_isNightModeInitialized)
         {
-            await LocalStorage.SetItemAsync("nightMode", IsNightMode);
+            await LocalStorage.SetItemAsync(NightModeKey, IsNightMode);
             await UpdateNightModeAsync();
         }
     }
