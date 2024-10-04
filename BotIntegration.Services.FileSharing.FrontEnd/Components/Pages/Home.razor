@@ -12,6 +12,23 @@
 <PageTitle>Upload a file and get the link</PageTitle>
 
 <div class="@(IsNightMode ? "night-mode" : "") max-w-md mx-auto p-6 bg-gray-50 rounded-lg shadow-md mt-1 lg:mt-6">
+    @if (!string.IsNullOrEmpty(ErrorMessage))
+    {
+        <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded relative" role="alert">
+            <div class="flex justify-between items-center">
+                <div>
+                    <strong class="font-bold">Error: </strong>
+                    <span class="inline">@ErrorMessage</span>
+                </div>
+                <button @onclick="ClearErrorMessage" class="text-red-500 hover:text-red-700 transition-colors duration-200 ml-4">
+                    <svg class="h-5 w-5" fill="currentColor" viewBox="0 0 20 20">
+                        <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    }
+
     <div class="flex justify-between items-center mb-4">
         <h1 class="text-xl font-bold">File Uploader</h1>
         <button @onclick="ToggleNightMode" 
@@ -89,7 +106,8 @@
     private bool ShowTooltip { get; set; }
     private bool IsUploading { get; set; }
     private bool IsNightMode { get; set; }
-    private bool _isNightModeInitialized = false;
+    private bool _isNightModeInitialized;
+    private string ErrorMessage { get; set; } = string.Empty;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
@@ -143,7 +161,7 @@
                 var fileSharingEndpointHealthUrl = Configuration["Urls:FileSharingEndpointHealth"];
                 if (fileSharingEndpointHealthUrl == null)
                 {
-                    Logger.LogWarning("Unable to determine the health status of the file sharing endpoint");
+                    SetErrorMessage("Unable to determine the health status of the file sharing endpoint");
                     return;
                 }
 
@@ -156,7 +174,7 @@
                 using var uploadEndHealthResponse = await httpClient.SendAsync(uploadEndHealthRequest);
                 if (uploadEndHealthResponse.IsSuccessStatusCode == false)
                 {
-                    Logger.LogWarning("File sharing endpoint is down");
+                    SetErrorMessage("File sharing endpoint is down");
                     return;
                 }
 
@@ -165,7 +183,7 @@
 
                 if ((authServer != null && clientId != null && String.IsNullOrWhiteSpace(ClientSecret) == false) == false)
                 {
-                    Logger.LogWarning("Unable to authorize the bot");
+                    SetErrorMessage("Unable to authorize the bot");
                     return;
                 }
 
@@ -174,14 +192,14 @@
                 var authData = await GetAuthData(httpClient, authServer, clientId, ClientSecret);
                 if (authData == null)
                 {
-                    Logger.LogWarning("Unable to authorize");
+                    SetErrorMessage("Unable to authorize");
                     return;
                 }
 
                 var fileSharingEndpointUrl = Configuration["Urls:FileSharingEndpoint"];
                 if (fileSharingEndpointUrl == null)
                 {
-                    Logger.LogWarning("Unable to get the file sharing endpoint url");
+                    SetErrorMessage("Unable to get the file sharing endpoint url");
                     return;
                 }
 
@@ -210,26 +228,31 @@
                 using var uploadFileResponse = await httpClient.SendAsync(uploadFileRequest);
                 if (uploadFileResponse.IsSuccessStatusCode == false)
                 {
-                    Logger.LogWarning("Unable to upload the audio file to file sharing server. StatusCode: {StatusCode}", uploadFileResponse.StatusCode);
+                    SetErrorMessage($"Unable to upload the audio file to file sharing server. StatusCode: {uploadFileResponse.StatusCode}");
                     return;
                 }
 
                 var uploadResultStr = await uploadFileResponse.Content.ReadAsStringAsync();
                 if (string.IsNullOrEmpty(uploadResultStr))
                 {
-                    Logger.LogWarning("Unable to get upload data from file sharing server");
+                    SetErrorMessage("Unable to get upload data from file sharing server");
                     return;
                 }
 
                 var uploadData = JsonSerializer.Deserialize<UploadData>(uploadResultStr);
                 if (uploadData == null)
                 {
-                    Logger.LogWarning("Unable to get upload data from file sharing server");
+                    SetErrorMessage("Unable to get upload data from file sharing server");
                     return;
                 }
 
                 LinkValue = uploadData.FileUrl;
             }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "An error occurred during file upload");
+            SetErrorMessage($"An error occurred: {ex.Message}");
         }
         finally
         {
@@ -289,5 +312,18 @@
     private async Task UpdateNightModeAsync()
     {
         await JsRuntime.InvokeVoidAsync("eval", $"document.body.classList.toggle('night-mode', {IsNightMode.ToString().ToLower()})");
+    }
+
+    private void ClearErrorMessage()
+    {
+        ErrorMessage = string.Empty;
+        StateHasChanged();
+    }
+
+    private void SetErrorMessage(string message)
+    {
+        ErrorMessage = message;
+        Logger.LogWarning(message);
+        StateHasChanged();
     }
 }
