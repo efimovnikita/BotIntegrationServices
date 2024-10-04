@@ -113,11 +113,29 @@
     {
         if (firstRender)
         {
-            var nightMode = await LocalStorage.GetItemAsync<bool>("nightMode");
-            IsNightMode = nightMode;
-            await UpdateNightModeAsync();
-            _isNightModeInitialized = true;
-            StateHasChanged();
+            try
+            {
+                var nightMode = await LocalStorage.GetItemAsync<bool>("nightMode");
+                IsNightMode = nightMode;
+                await UpdateNightModeAsync();
+                _isNightModeInitialized = true;
+
+                var secret = await LocalStorage.GetItemAsStringAsync(Key);
+                if (string.IsNullOrWhiteSpace(secret))
+                {
+                    return;
+                }
+
+                ClientSecret = secret;
+            }
+            catch (Exception e)
+            {
+                SetErrorMessage($"An error occurred while initializing the page: {e.Message}");
+            }
+            finally
+            {
+                StateHasChanged();   
+            }
         }
     }
 
