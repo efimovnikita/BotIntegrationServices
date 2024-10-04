@@ -70,3 +70,16 @@ body.night-mode {
 .night-mode button.bg-transparent:hover {
     opacity: 0.8;
 }
+
+/* Night mode file input styles */
+.night-mode .file-input::-webkit-file-upload-button {
+    background-color: #4a5568;
+    color: #e2e8f0;
+    border: 1px solid #4a5568;
+}
+
+.night-mode .file-input::file-selector-button {
+    background-color: #4a5568;
+    color: #e2e8f0;
+    border: 1px solid #4a5568;
+}
