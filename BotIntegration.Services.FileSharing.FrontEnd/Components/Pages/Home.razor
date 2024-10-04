@@ -11,7 +11,16 @@
 
 <PageTitle>Upload a file and get the link</PageTitle>
 
-<div class="max-w-md mx-auto p-6 bg-gray-50 rounded-lg shadow-md mt-1 lg:mt-6">
+<div class="@(IsNightMode ? "night-mode" : "") max-w-md mx-auto p-6 bg-gray-50 rounded-lg shadow-md mt-1 lg:mt-6">
+    <div class="flex justify-between items-center mb-4">
+        <h1 class="text-xl font-bold">File Uploader</h1>
+        <button @onclick="ToggleNightMode" 
+                class="text-2xl bg-transparent border-none focus:outline-none" 
+                aria-label="Toggle night mode">
+            @(IsNightMode ? "🌙" : "☀️")
+        </button>
+    </div>
+
     <div class="mb-4">
         <label class="block text-gray-700 text-sm font-bold mb-2" for="file-input">
             Select File
@@ -79,17 +88,19 @@
     private string ClientSecret { get; set; } = string.Empty;
     private bool ShowTooltip { get; set; }
     private bool IsUploading { get; set; }
+    private bool IsNightMode { get; set; }
+    private bool _isNightModeInitialized = false;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        var secret = await LocalStorage.GetItemAsStringAsync(Key);
-        if (string.IsNullOrWhiteSpace(secret))
+        if (firstRender)
         {
-            return;
+            var nightMode = await LocalStorage.GetItemAsync<bool>("nightMode");
+            IsNightMode = nightMode;
+            await UpdateNightModeAsync();
+            _isNightModeInitialized = true;
+            StateHasChanged();
         }
-
-        ClientSecret = secret;
-        StateHasChanged();
     }
 
     private void HandleFileSelected(InputFileChangeEventArgs e)
@@ -263,5 +274,20 @@
             Logger.LogError(e, "Error while getting the auth data");
             return null;
         }
+    }
+
+    private async Task ToggleNightMode()
+    {
+        IsNightMode = !IsNightMode;
+        if (_isNightModeInitialized)
+        {
+            await LocalStorage.SetItemAsync("nightMode", IsNightMode);
+            await UpdateNightModeAsync();
+        }
+    }
+
+    private async Task UpdateNightModeAsync()
+    {
+        await JsRuntime.InvokeVoidAsync("eval", $"document.body.classList.toggle('night-mode', {IsNightMode.ToString().ToLower()})");
     }
 }

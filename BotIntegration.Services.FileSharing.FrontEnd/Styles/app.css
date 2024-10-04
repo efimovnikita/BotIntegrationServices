@@ -9,3 +9,64 @@
 .animate-indeterminate-progress {
     animation: indeterminate-progress 1.5s infinite linear;
 }
+
+/* Night mode styles */
+.night-mode {
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.night-mode input,
+.night-mode button:not(.bg-transparent) {
+    background-color: #2a2a2a;
+    color: #ffffff;
+    border-color: #3a3a3a;
+}
+
+.night-mode button:not(.bg-transparent):hover {
+    background-color: #3a3a3a;
+}
+
+.night-mode .bg-gray-50 {
+    background-color: #2a2a2a;
+}
+
+.night-mode .text-gray-700 {
+    color: #e0e0e0;
+}
+
+.night-mode .bg-white {
+    background-color: #3a3a3a;
+}
+
+body.night-mode {
+    background-color: #1a1a1a;
+}
+
+/* Night mode button styles */
+.night-mode button:not(.bg-transparent) {
+    background-color: #4a90e2;
+    color: #ffffff;
+    border: 1px solid #ffffff;
+}
+
+.night-mode button:not(.bg-transparent):hover {
+    background-color: #357abd;
+}
+
+.night-mode button:not(.bg-transparent):disabled {
+    background-color: #2a2a2a;
+    color: #666666;
+    border-color: #666666;
+}
+
+/* Toggle button styles */
+.night-mode button.bg-transparent {
+    background-color: transparent;
+    border: none;
+    color: #ffffff;
+}
+
+.night-mode button.bg-transparent:hover {
+    opacity: 0.8;
+}
