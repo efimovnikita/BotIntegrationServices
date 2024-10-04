@@ -118,13 +118,7 @@
           "Host": "${Urls__FilesShareEndpoint}",
           "Port": 8080
         }
-      ],
-      "RateLimitOptions": {
-        "EnableRateLimiting": true,
-        "Period": "1m",
-        "PeriodTimespan": 60,
-        "Limit": 5
-      }
+      ]
     },
     {
       "UpstreamPathTemplate": "/api/gateway/files-share/v1/upload",

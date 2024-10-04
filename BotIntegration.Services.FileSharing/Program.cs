@@ -1,4 +1,5 @@
 using Serilog;
+using Microsoft.Extensions.FileProviders;
 
 try
 {
@@ -25,6 +26,15 @@ try
     builder.Services.AddControllers();
 
     var app = builder.Build();
+
+    var uploadsPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads"));
+
+    app.UseDirectoryBrowser(new DirectoryBrowserOptions
+    {
+        FileProvider = new PhysicalFileProvider(uploadsPath),
+        RequestPath = "/uploads"
+    });
+
     app.UseStaticFiles();
     app.MapControllers();
 
