@@ -234,7 +234,7 @@
 
                 var content = new MultipartFormDataContent();
 
-                await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 100_000_000);
+                await using var stream = _selectedFile.OpenReadStream(maxAllowedSize: 300_000_000);
                 using var memoryStream = new MemoryStream();
                 await stream.CopyToAsync(memoryStream);
                 var fileBytes = memoryStream.ToArray();
